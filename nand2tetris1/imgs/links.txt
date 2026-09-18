@@ -1,0 +1,3 @@
+
+//claude generated chip -specs of all 15 elementaty chips/logic gates
+https://claude.ai/code/artifact/5394301b-7e07-4357-807a-a31ce0ea21f3 
