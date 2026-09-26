@@ -18,5 +18,13 @@ CHIP Computer {
     IN reset;
 
     PARTS:
-    //// Replace this comment with your code.
+    // Instruction memory: the PC addresses the ROM, which emits the instruction.
+    ROM32K (address=pcOut, out=instruction);
+
+    // The CPU executes it, producing a data-memory access and the next PC.
+    CPU (inM=memOut, instruction=instruction, reset=reset,
+         outM=outM, writeM=writeM, addressM=addressM, pc=pcOut);
+
+    // Data memory: RAM + screen + keyboard behind one address space.
+    Memory (in=outM, load=writeM, address=addressM, out=memOut);
 }

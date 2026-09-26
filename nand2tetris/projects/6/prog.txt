@@ -1,0 +1,4 @@
+Programming option: assembler implemented in Java.
+Source: projects/6/src/ (Parser, Code, SymbolTable, FirstPass, SecondPass, Assembler)
+Build: javac -d out *.java
+Run:   java -cp out Assembler <file.asm>
