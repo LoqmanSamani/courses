@@ -1,0 +1,596 @@
+function Blocks.init 0
+push constant 12
+pop static 0
+push constant 6
+pop static 1
+push constant 5
+pop static 2
+push constant 8
+call Array.new 1
+pop static 3
+push constant 0
+return
+function Blocks.colToX 0
+push static 1
+push argument 0
+push static 0
+call Math.multiply 2
+add
+return
+function Blocks.rowToY 0
+push static 2
+push argument 0
+push static 0
+call Math.multiply 2
+add
+return
+function Blocks.drawCell 0
+push constant 0
+not
+call Screen.setColor 1
+pop temp 0
+push argument 0
+push argument 1
+push argument 0
+push constant 11
+add
+push argument 1
+push constant 11
+add
+call Screen.drawRectangle 4
+pop temp 0
+push argument 2
+push constant 0
+eq
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push constant 0
+call Screen.setColor 1
+pop temp 0
+push argument 0
+push constant 1
+add
+push argument 1
+push constant 1
+add
+push argument 0
+push constant 10
+add
+push argument 1
+push constant 10
+add
+call Screen.drawRectangle 4
+pop temp 0
+push constant 0
+not
+call Screen.setColor 1
+pop temp 0
+push argument 2
+push constant 1
+eq
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push constant 0
+return
+label IF_FALSE1
+push argument 2
+push constant 2
+eq
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push argument 0
+push constant 3
+add
+push argument 1
+push constant 3
+add
+push argument 0
+push constant 8
+add
+push argument 1
+push constant 8
+add
+call Screen.drawRectangle 4
+pop temp 0
+push constant 0
+return
+label IF_FALSE2
+push argument 2
+push constant 3
+eq
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push argument 0
+push constant 1
+add
+push argument 1
+push constant 2
+add
+push argument 0
+push constant 10
+add
+push argument 1
+push constant 4
+add
+call Screen.drawRectangle 4
+pop temp 0
+push argument 0
+push constant 1
+add
+push argument 1
+push constant 7
+add
+push argument 0
+push constant 10
+add
+push argument 1
+push constant 9
+add
+call Screen.drawRectangle 4
+pop temp 0
+push constant 0
+return
+label IF_FALSE3
+push argument 2
+push constant 4
+eq
+if-goto IF_TRUE4
+goto IF_FALSE4
+label IF_TRUE4
+push argument 0
+push constant 2
+add
+push argument 1
+push constant 1
+add
+push argument 0
+push constant 4
+add
+push argument 1
+push constant 10
+add
+call Screen.drawRectangle 4
+pop temp 0
+push argument 0
+push constant 7
+add
+push argument 1
+push constant 1
+add
+push argument 0
+push constant 9
+add
+push argument 1
+push constant 10
+add
+call Screen.drawRectangle 4
+pop temp 0
+push constant 0
+return
+label IF_FALSE4
+push argument 2
+push constant 5
+eq
+if-goto IF_TRUE5
+goto IF_FALSE5
+label IF_TRUE5
+push argument 0
+push constant 1
+add
+push argument 1
+push constant 1
+add
+push argument 0
+push constant 5
+add
+push argument 1
+push constant 5
+add
+call Screen.drawRectangle 4
+pop temp 0
+push argument 0
+push constant 6
+add
+push argument 1
+push constant 6
+add
+push argument 0
+push constant 10
+add
+push argument 1
+push constant 10
+add
+call Screen.drawRectangle 4
+pop temp 0
+push constant 0
+return
+label IF_FALSE5
+push argument 0
+push constant 6
+add
+push argument 1
+push constant 1
+add
+push argument 0
+push constant 10
+add
+push argument 1
+push constant 5
+add
+call Screen.drawRectangle 4
+pop temp 0
+push argument 0
+push constant 1
+add
+push argument 1
+push constant 6
+add
+push argument 0
+push constant 5
+add
+push argument 1
+push constant 10
+add
+call Screen.drawRectangle 4
+pop temp 0
+push constant 0
+return
+function Blocks.eraseCell 0
+push constant 0
+call Screen.setColor 1
+pop temp 0
+push argument 0
+push argument 1
+push argument 0
+push constant 11
+add
+push argument 1
+push constant 11
+add
+call Screen.drawRectangle 4
+pop temp 0
+push constant 0
+return
+function Blocks.drawBoardCell 0
+push argument 1
+push constant 0
+lt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push argument 0
+call Blocks.colToX 1
+push argument 1
+call Blocks.rowToY 1
+push argument 2
+call Blocks.drawCell 3
+pop temp 0
+push constant 0
+return
+function Blocks.eraseBoardCell 0
+push argument 1
+push constant 0
+lt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push argument 0
+call Blocks.colToX 1
+push argument 1
+call Blocks.rowToY 1
+call Blocks.eraseCell 2
+pop temp 0
+push constant 0
+return
+function Blocks.drawGhostCell 2
+push argument 1
+push constant 0
+lt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push argument 0
+call Blocks.colToX 1
+pop local 0
+push argument 1
+call Blocks.rowToY 1
+pop local 1
+push constant 0
+not
+call Screen.setColor 1
+pop temp 0
+push local 0
+push constant 5
+add
+push local 1
+push constant 5
+add
+push local 0
+push constant 6
+add
+push local 1
+push constant 6
+add
+call Screen.drawRectangle 4
+pop temp 0
+push constant 0
+return
+function Blocks.eraseGhostCell 2
+push argument 1
+push constant 0
+lt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push argument 0
+call Blocks.colToX 1
+pop local 0
+push argument 1
+call Blocks.rowToY 1
+pop local 1
+push constant 0
+call Screen.setColor 1
+pop temp 0
+push local 0
+push constant 4
+add
+push local 1
+push constant 4
+add
+push local 0
+push constant 7
+add
+push local 1
+push constant 7
+add
+call Screen.drawRectangle 4
+pop temp 0
+push constant 0
+return
+function Blocks.drawBoxFrame 0
+push constant 0
+not
+call Screen.setColor 1
+pop temp 0
+push argument 0
+push argument 1
+push argument 0
+push argument 2
+add
+push constant 1
+sub
+push argument 1
+push argument 3
+add
+push constant 1
+sub
+call Screen.drawRectangle 4
+pop temp 0
+push constant 0
+call Screen.setColor 1
+pop temp 0
+push argument 0
+push constant 2
+add
+push argument 1
+push constant 2
+add
+push argument 0
+push argument 2
+add
+push constant 3
+sub
+push argument 1
+push argument 3
+add
+push constant 3
+sub
+call Screen.drawRectangle 4
+pop temp 0
+push constant 0
+return
+function Blocks.drawWellFrame 0
+push constant 3
+push constant 2
+push constant 126
+push constant 246
+call Blocks.drawBoxFrame 4
+pop temp 0
+push constant 0
+return
+function Blocks.drawPieceBox 9
+push constant 0
+call Screen.setColor 1
+pop temp 0
+push argument 0
+push argument 1
+push argument 0
+push constant 47
+add
+push argument 1
+push constant 47
+add
+call Screen.drawRectangle 4
+pop temp 0
+push argument 2
+push constant 0
+lt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push argument 2
+push constant 0
+push static 3
+call Shapes.cells 3
+pop temp 0
+push constant 4
+pop local 1
+push constant 1
+neg
+pop local 2
+push constant 4
+pop local 3
+push constant 1
+neg
+pop local 4
+push constant 0
+pop local 0
+label WHILE_EXP0
+push local 0
+push constant 8
+lt
+not
+if-goto WHILE_END0
+push local 0
+push static 3
+add
+pop pointer 1
+push that 0
+pop local 5
+push local 0
+push constant 1
+add
+push static 3
+add
+pop pointer 1
+push that 0
+pop local 6
+push local 5
+push local 1
+lt
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push local 5
+pop local 1
+label IF_FALSE1
+push local 5
+push local 2
+gt
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push local 5
+pop local 2
+label IF_FALSE2
+push local 6
+push local 3
+lt
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push local 6
+pop local 3
+label IF_FALSE3
+push local 6
+push local 4
+gt
+if-goto IF_TRUE4
+goto IF_FALSE4
+label IF_TRUE4
+push local 6
+pop local 4
+label IF_FALSE4
+push local 0
+push constant 2
+add
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+push argument 0
+push constant 48
+push local 2
+push local 1
+sub
+push constant 1
+add
+push constant 12
+call Math.multiply 2
+sub
+push constant 2
+call Math.divide 2
+add
+push local 1
+push constant 12
+call Math.multiply 2
+sub
+pop local 7
+push argument 1
+push constant 48
+push local 4
+push local 3
+sub
+push constant 1
+add
+push constant 12
+call Math.multiply 2
+sub
+push constant 2
+call Math.divide 2
+add
+push local 3
+push constant 12
+call Math.multiply 2
+sub
+pop local 8
+push constant 0
+pop local 0
+label WHILE_EXP1
+push local 0
+push constant 8
+lt
+not
+if-goto WHILE_END1
+push local 7
+push local 0
+push static 3
+add
+pop pointer 1
+push that 0
+push constant 12
+call Math.multiply 2
+add
+push local 8
+push local 0
+push constant 1
+add
+push static 3
+add
+pop pointer 1
+push that 0
+push constant 12
+call Math.multiply 2
+add
+push argument 2
+call Blocks.drawCell 3
+pop temp 0
+push local 0
+push constant 2
+add
+pop local 0
+goto WHILE_EXP1
+label WHILE_END1
+push constant 0
+return

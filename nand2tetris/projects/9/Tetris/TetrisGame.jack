@@ -1,0 +1,508 @@
+/**
+ * TetrisGame -- one game: the loop, the rules, the keyboard, the scoring.
+ *
+ * It owns a Board (what has settled), a Piece (what is falling) and a
+ * Randomizer (what comes next), and it is the only class that knows about time.
+ *
+ * WHO DRAWS WHAT
+ * Board paints the settled blocks, because it is the only thing that knows where
+ * they are. The falling piece is painted here instead, because erasing it needs
+ * last frame's position, and remembering that is the game's business and not the
+ * piece's. The two cell lists below, `shownCells` and `shownGhost`, are that
+ * memory: they hold exactly what is currently on the screen, so a redraw is
+ * four erases and four draws rather than a repaint of the well. On a machine
+ * this slow that difference is the difference between a game and a slideshow.
+ *
+ * TIMING
+ * There is no clock, so time is counted in frames. One pass of the loop is one
+ * frame; `fallPeriod` frames pass between gravity steps, and it shrinks as the
+ * level rises.
+ */
+class TetrisGame {
+
+    field Board board;
+    field Piece piece;
+    field Randomizer rng;
+
+    field int score, lines, level;
+    field int nextKind;        // the kind waiting in the NEXT box
+    field int holdKind;        // the kind parked in HOLD, or -1 if empty
+    field boolean holdLocked;  // a piece may only be swapped into HOLD once
+
+    field int fallPeriod;      // frames between gravity steps, set by the level
+    field int fallTimer;       // frames until the next gravity step
+    field int lockTimer;       // frames of grace left while the piece rests
+    field int lockResets;      // how often that grace has been renewed
+
+    field int lastKey;         // key seen last frame, for press detection
+    field int repeatTimer;     // frames until a held key fires again
+
+    field Array shownCells;    // the four piece cells currently on screen
+    field Array shownGhost;    // the four shadow cells currently on screen
+    field boolean anythingShown;
+
+    field boolean alive;       // false once the well has overflowed
+    field boolean quit;        // true if the player asked to stop
+
+    // ---- tuning constants -------------------------------------------------
+    // All in frames, except frameMs. These are the numbers to turn if the game
+    // feels wrong on a particular emulator speed.
+    function int frameMs()       { return 10; }  // nominal frame length
+    function int firstRepeat()   { return 9; }   // held key: pause before repeat
+    function int nextRepeat()    { return 3; }   // held key: repeat interval
+    function int lockDelay()     { return 12; }  // grace before a resting piece locks
+    function int maxLockResets() { return 8; }   // how often that grace may be renewed
+
+    constructor TetrisGame new(int seed) {
+        do Screen.clearScreen();
+
+        let board = Board.new();
+        let piece = Piece.new();
+        let rng = Randomizer.new(seed);
+        let shownCells = Array.new(8);
+        let shownGhost = Array.new(8);
+
+        let score = 0;
+        let lines = 0;
+        let level = 1;
+        let holdKind = -1;
+        let holdLocked = false;
+        let lastKey = 0;
+        let repeatTimer = 0;
+        let anythingShown = false;
+        let alive = true;
+        let quit = false;
+        do setSpeed();
+
+        do Hud.drawStatic();
+        do Hud.drawScore(0);
+        do Hud.drawLines(0);
+        do Hud.drawLevel(1);
+        do Hud.drawHold(-1);
+
+        let nextKind = rng.next();
+        do spawn();
+        return this;
+    }
+
+    method void dispose() {
+        do board.dispose();
+        do piece.dispose();
+        do rng.dispose();
+        do shownCells.dispose();
+        do shownGhost.dispose();
+        do Memory.deAlloc(this);
+        return;
+    }
+
+    method int getScore() { return score; }
+    method int getLines() { return lines; }
+    method int getLevel() { return level; }
+    method boolean quitRequested() { return quit; }
+
+    /**
+     * The game loop. One pass is one frame: read the keyboard, let gravity act,
+     * wait a little.
+     *
+     * Key handling is the fiddly part. Keyboard.keyPressed reports the key that
+     * is held *right now*, so a key held for twenty frames looks like twenty
+     * presses. Comparing against last frame's key turns that back into a single
+     * press, and then a deliberate auto-repeat is added on top -- a pause, then
+     * a faster cadence -- so that holding LEFT slides the piece smoothly instead
+     * of either jumping or crawling.
+     */
+    method void run() {
+        var int key;
+
+        while (alive & (~quit)) {
+            let key = Keyboard.keyPressed();
+
+            if (key = 0) {
+                let repeatTimer = 0;
+            } else {
+                if (~(key = lastKey)) {
+                    // A new key: act at once.
+                    do handleKey(key, true);
+                    let repeatTimer = TetrisGame.firstRepeat();
+                } else {
+                    // The same key, still held: act again when the timer runs out.
+                    let repeatTimer = repeatTimer - 1;
+                    if (repeatTimer < 1) {
+                        do handleKey(key, false);
+                        let repeatTimer = TetrisGame.nextRepeat();
+                    }
+                }
+            }
+            let lastKey = key;
+
+            // handleKey can end the game, so re-check before letting time pass.
+            if (alive & (~quit)) {
+                do gravity();
+            }
+            do Sys.wait(TetrisGame.frameMs());
+        }
+        return;
+    }
+
+    /**
+     * Acts on one key.
+     *
+     * `fresh` is false when this is an auto-repeat of a held key. Sliding and
+     * soft-dropping are allowed to repeat; rotating, hard-dropping, holding,
+     * pausing and quitting must not, or resting a finger on the key would spin
+     * the piece into a blur or quit the game by accident.
+     */
+    method void handleKey(int key, boolean fresh) {
+        if (key = 130) { do slide(-1);  return; }    // left arrow
+        if (key = 132) { do slide(1);   return; }    // right arrow
+        if (key = 133) { do softDrop(); return; }    // down arrow
+
+        if (~fresh) { return; }
+
+        if (key = 131) { do spin(1);    return; }    // up arrow
+        if (key = 90)  { do spin(-1);   return; }    // Z
+        if (key = 122) { do spin(-1);   return; }    // z
+        if (key = 32)  { do hardDrop(); return; }    // space
+        if (key = 67)  { do hold();     return; }    // C
+        if (key = 99)  { do hold();     return; }    // c
+        if (key = 80)  { do pause();    return; }    // P
+        if (key = 112) { do pause();    return; }    // p
+        if (key = 81)  { let quit = true; return; }  // Q
+        if (key = 113) { let quit = true; return; }  // q
+        return;
+    }
+
+    /** Moves the piece one column left (-1) or right (1). */
+    method void slide(int dc) {
+        if (piece.tryMove(board, dc, 0)) {
+            do refresh();
+            do renewLockDelay();
+        }
+        return;
+    }
+
+    /** Turns the piece clockwise (1) or anticlockwise (-1). */
+    method void spin(int dir) {
+        if (piece.tryRotate(board, dir)) {
+            do refresh();
+            do renewLockDelay();
+        }
+        return;
+    }
+
+    /** One row down by hand, worth a point, and the fall timer restarts. */
+    method void softDrop() {
+        if (piece.tryMove(board, 0, 1)) {
+            do addScore(1);
+            do refresh();
+            let fallTimer = fallPeriod;
+            let lockTimer = -1;
+        }
+        return;
+    }
+
+    /**
+     * Slams the piece to the bottom and locks it immediately, two points a row.
+     *
+     * The distance is already known -- it is what the landing shadow is drawn
+     * from -- so this is a single move rather than a loop.
+     */
+    method void hardDrop() {
+        var int distance;
+        var boolean moved;
+        let distance = piece.dropDistance(board);
+        if (distance > 0) {
+            let moved = piece.tryMove(board, 0, distance);
+            do addScore(distance + distance);
+            do refresh();
+        }
+        do lockPiece();
+        return;
+    }
+
+    /**
+     * Parks the falling piece in the HOLD box and brings out whatever was there,
+     * or the next piece if HOLD was empty.
+     *
+     * Once per piece only. Without that limit a player could swap back and forth
+     * forever and never have to commit to a placement.
+     */
+    method void hold() {
+        var int parked;
+        if (holdLocked) {
+            return;
+        }
+        do eraseShown();
+
+        let parked = holdKind;
+        let holdKind = piece.getKind();
+        do Hud.drawHold(holdKind);
+
+        if (parked < 0) {
+            do piece.spawn(nextKind);
+            let nextKind = rng.next();
+            do Hud.drawNext(nextKind);
+        } else {
+            do piece.spawn(parked);
+        }
+
+        let holdLocked = true;
+        do restartPieceTimers();
+        do showNewPiece();
+        return;
+    }
+
+    /** Freezes the game until another key is pressed. */
+    method void pause() {
+        do Hud.showPaused(true);
+        do Screens.waitForRelease();
+        do Screens.waitForKey();
+        do Screens.waitForRelease();
+        do Hud.showPaused(false);
+        return;
+    }
+
+    /**
+     * One frame of falling.
+     *
+     * A piece that cannot fall is not locked on the spot. It is given a dozen
+     * frames of grace first, which is what lets a player slide a piece into an
+     * overhang at the last moment -- the move that makes the difference between
+     * a flat stack and a hole. renewLockDelay restarts that grace on a
+     * successful move, but only a limited number of times, so a piece cannot be
+     * kept alive indefinitely by spinning it.
+     */
+    method void gravity() {
+        var boolean moved;
+
+        if (~(piece.canFall(board))) {
+            if (lockTimer < 0) {
+                let lockTimer = TetrisGame.lockDelay();
+            }
+            let lockTimer = lockTimer - 1;
+            if (lockTimer < 1) {
+                do lockPiece();
+            }
+            return;
+        }
+
+        let lockTimer = -1;
+        let fallTimer = fallTimer - 1;
+        if (fallTimer < 1) {
+            let moved = piece.tryMove(board, 0, 1);
+            let fallTimer = fallPeriod;
+            do refresh();
+        }
+        return;
+    }
+
+    /** Restarts the grace period, up to the allowed number of times. */
+    method void renewLockDelay() {
+        if (lockTimer > -1) {
+            if (lockResets < TetrisGame.maxLockResets()) {
+                let lockTimer = TetrisGame.lockDelay();
+                let lockResets = lockResets + 1;
+            }
+        }
+        return;
+    }
+
+    /**
+     * Settles the piece into the well, scores any completed rows, and brings out
+     * the next piece.
+     */
+    method void lockPiece() {
+        var int cleared;
+
+        do settleShown();
+        do piece.lockInto(board);
+        let anythingShown = false;
+
+        if (board.hasFullRows()) {
+            do board.flashFullRows(2);
+            let cleared = board.clearLines();
+            // Only the rows at or above the lowest row removed have moved, so
+            // the untouched rows below are left alone.
+            do board.renderRows(0, board.lowestCleared());
+
+            let lines = lines + cleared;
+            do addScore(TetrisGame.lineScore(cleared) * level);
+            do Hud.drawLines(lines);
+
+            if (TetrisGame.levelFor(lines) > level) {
+                let level = TetrisGame.levelFor(lines);
+                do setSpeed();
+                do Hud.drawLevel(level);
+            }
+        }
+
+        do spawn();
+        return;
+    }
+
+    /** Brings the NEXT piece into play and refills the preview. */
+    method void spawn() {
+        do piece.spawn(nextKind);
+        let nextKind = rng.next();
+        do Hud.drawNext(nextKind);
+        let holdLocked = false;
+        do restartPieceTimers();
+        do showNewPiece();
+        return;
+    }
+
+    method void restartPieceTimers() {
+        let fallTimer = fallPeriod;
+        let lockTimer = -1;
+        let lockResets = 0;
+        let anythingShown = false;
+        return;
+    }
+
+    /**
+     * Draws a piece that has just appeared -- or ends the game, if there was no
+     * room for it. A new piece that does not fit is exactly what "the well has
+     * overflowed" means.
+     */
+    method void showNewPiece() {
+        if (piece.fits(board)) {
+            do refresh();
+        } else {
+            let alive = false;
+        }
+        return;
+    }
+
+    /**
+     * Repaints the falling piece and its landing shadow.
+     *
+     * Order matters. The shadow is erased before the piece, because a shadow dot
+     * may sit inside a cell the piece occupies; and the shadow is drawn before
+     * the piece, so that the piece covers the dots it overlaps instead of being
+     * speckled by them.
+     */
+    method void refresh() {
+        var int i, distance, c, r;
+
+        do eraseShown();
+
+        let distance = piece.dropDistance(board);
+        let i = 0;
+        while (i < 4) {
+            let c = piece.cellCol(i);
+            let r = piece.cellRow(i);
+            let shownCells[i * 2] = c;
+            let shownCells[(i * 2) + 1] = r;
+            let shownGhost[i * 2] = c;
+            let shownGhost[(i * 2) + 1] = r + distance;
+            let i = i + 1;
+        }
+
+        let i = 0;
+        while (i < 8) {
+            do Blocks.drawGhostCell(shownGhost[i], shownGhost[i + 1]);
+            let i = i + 2;
+        }
+        let i = 0;
+        while (i < 8) {
+            do Blocks.drawBoardCell(shownCells[i], shownCells[i + 1], piece.getKind());
+            let i = i + 2;
+        }
+        let anythingShown = true;
+        return;
+    }
+
+    /** Wipes the piece and its shadow off the screen. */
+    method void eraseShown() {
+        var int i;
+        if (~anythingShown) {
+            return;
+        }
+        let i = 0;
+        while (i < 8) {
+            do Blocks.eraseGhostCell(shownGhost[i], shownGhost[i + 1]);
+            let i = i + 2;
+        }
+        let i = 0;
+        while (i < 8) {
+            do Blocks.eraseBoardCell(shownCells[i], shownCells[i + 1]);
+            let i = i + 2;
+        }
+        let anythingShown = false;
+        return;
+    }
+
+    /**
+     * Turns the drawn piece into part of the wall.
+     *
+     * The blocks themselves are already on the screen with the right pattern, so
+     * only the shadow has to go. Erasing a shadow dot can punch a small white
+     * hole in a block the piece occupies, so the four cells are redrawn after.
+     */
+    method void settleShown() {
+        var int i;
+        if (~anythingShown) {
+            return;
+        }
+        let i = 0;
+        while (i < 8) {
+            do Blocks.eraseGhostCell(shownGhost[i], shownGhost[i + 1]);
+            let i = i + 2;
+        }
+        let i = 0;
+        while (i < 8) {
+            do Blocks.drawBoardCell(shownCells[i], shownCells[i + 1], piece.getKind());
+            let i = i + 2;
+        }
+        return;
+    }
+
+    /**
+     * Adds to the score, and keeps it inside a 16-bit integer.
+     *
+     * 32767 is genuinely the ceiling: the Hack machine has no wider number, and
+     * letting it overflow would turn a good game into a negative score.
+     */
+    method void addScore(int points) {
+        if ((32767 - score) < points) {
+            let score = 32767;
+        } else {
+            let score = score + points;
+        }
+        do Hud.drawScore(score);
+        return;
+    }
+
+    /**
+     * What a clear is worth, before the level multiplier.
+     *
+     * The jumps are steep on purpose, and they are the whole strategy of the
+     * game: four single rows score 400, while one four-row clear scores 800.
+     */
+    function int lineScore(int rows) {
+        if (rows = 1) { return 100; }
+        if (rows = 2) { return 300; }
+        if (rows = 3) { return 500; }
+        if (rows = 4) { return 800; }
+        return 0;
+    }
+
+    /** A level every ten rows, up to fifteen. */
+    function int levelFor(int rows) {
+        var int result;
+        let result = (rows / 10) + 1;
+        if (result > 15) {
+            let result = 15;
+        }
+        return result;
+    }
+
+    /** Frames between gravity steps: 32 at level 1, down to 4 at level 15. */
+    method void setSpeed() {
+        let fallPeriod = 32 - ((level - 1) * 2);
+        if (fallPeriod < 4) {
+            let fallPeriod = 4;
+        }
+        return;
+    }
+}

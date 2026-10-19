@@ -1,0 +1,112 @@
+/**
+ * Randomizer -- decides which piece comes next.
+ *
+ * Two ideas here, and the second is the one that matters to the player.
+ *
+ * RANDOM NUMBERS WITHOUT A CLOCK
+ * The Hack machine has no clock and no entropy of any kind, so a pseudo-random
+ * sequence can only come from a seed the program is handed. This one uses a
+ * linear congruential generator, seed = (seed * 25173) + 13849, whose constants
+ * are the classic 16-bit pair. It needs arithmetic modulo 2^16 -- which is
+ * exactly what Jack's silently wrapping 16-bit integers give for free, so the
+ * overflow that is usually a bug is here the whole mechanism.
+ *
+ * THE BAG
+ * Choosing each piece independently at random is what early Tetris clones did,
+ * and it plays badly: a long drought of I pieces is perfectly likely, and so is
+ * the same piece five times running. Instead this deals from a "bag" holding one
+ * of each of the seven kinds, shuffled, and refills it when it runs out. Every
+ * kind is then guaranteed to arrive once in every seven, and no kind can appear
+ * more than twice in a row. The game stops feeling spiteful.
+ */
+class Randomizer {
+
+    field int seed;
+    field Array bag;    // the seven kinds, in a shuffled order
+    field int dealt;    // how many of the current bag have been handed out
+
+    constructor Randomizer new(int firstSeed) {
+        var int i;
+        let bag = Array.new(Shapes.kindCount());
+        let seed = firstSeed;
+        // Starting "empty" makes the first next() shuffle, so there is no
+        // separate set-up step to forget.
+        let dealt = Shapes.kindCount();
+
+        // Stir the seed before anybody draws from it. The seed handed to us is a
+        // count of frames, so in practice it is a smallish number and two games
+        // played seconds apart arrive with nearly equal seeds. A few throwaway
+        // steps scatter those neighbouring values across the whole state space,
+        // so two games in a row do not open with the same pieces.
+        let i = 0;
+        while (i < 7) {
+            let seed = (seed * 25173) + 13849;
+            let i = i + 1;
+        }
+        return this;
+    }
+
+    method void dispose() {
+        do bag.dispose();
+        do Memory.deAlloc(this);
+        return;
+    }
+
+    /**
+     * A pseudo-random number in 0..n-1.
+     *
+     * The low bits are deliberately thrown away. In any generator whose modulus
+     * is a power of two the bottom bits are far weaker than the top ones -- bit
+     * 0 simply alternates, bit 1 has period four, and so on -- so taking the
+     * remainder of the raw state would lean heavily on the worst bits it has.
+     * Measured over the seeds this game actually sees, reading the state as-is
+     * gives one piece four times as often as another; dropping the bottom four
+     * bits first makes the seven very nearly equally likely.
+     *
+     * The & 32767 clears the sign bit, which is the cheapest way to get a
+     * non-negative number to take a remainder of.
+     */
+    method int rand(int n) {
+        var int value;
+        let seed = (seed * 25173) + 13849;
+        let value = (seed & 32767) / 16;
+        return value - ((value / n) * n);
+    }
+
+    /** The next kind to play. */
+    method int next() {
+        var int kind;
+        if (dealt = Shapes.kindCount()) {
+            do shuffle();
+            let dealt = 0;
+        }
+        let kind = bag[dealt];
+        let dealt = dealt + 1;
+        return kind;
+    }
+
+    /**
+     * Refills the bag with one of each kind and shuffles it.
+     *
+     * This is a Fisher-Yates shuffle: walk from the last slot down, and swap
+     * each slot with a randomly chosen slot at or before it. Every one of the
+     * 5040 orderings is equally likely, and it needs no extra storage.
+     */
+    method void shuffle() {
+        var int i, j, swap;
+        let i = 0;
+        while (i < Shapes.kindCount()) {
+            let bag[i] = i;
+            let i = i + 1;
+        }
+        let i = Shapes.kindCount() - 1;
+        while (i > 0) {
+            let j = rand(i + 1);
+            let swap = bag[i];
+            let bag[i] = bag[j];
+            let bag[j] = swap;
+            let i = i - 1;
+        }
+        return;
+    }
+}

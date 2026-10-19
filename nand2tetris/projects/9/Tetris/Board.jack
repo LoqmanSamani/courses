@@ -1,0 +1,252 @@
+/**
+ * Board -- the well: which cells are occupied, and by what.
+ *
+ * The board is 10 columns by 20 rows. It is stored as an array of row arrays
+ * rather than one flat array, and that choice is what makes clearing lines
+ * cheap -- see clearLines below.
+ *
+ * Each cell holds `kind + 1`, so that 0 can mean "empty" while kind 0 (the I
+ * piece) remains a perfectly good value. Callers never see that offset: they
+ * ask isFree() or cellKind(), which returns -1 for an empty cell.
+ *
+ * Board knows nothing about tetrominoes. A piece asks it "is this cell free?"
+ * and tells it "put a block here"; all of the shape arithmetic lives in Piece.
+ * Board does draw the settled blocks, because it is the only thing that knows
+ * where they are.
+ */
+class Board {
+
+    field Array grid;      // grid[r] is an Array of cols() cell values
+    field Array rowFill;   // rowFill[r] = how many cells of row r are occupied
+    field Array spare;     // row arrays recycled by clearLines (at most 4)
+    field int clearedLow;  // bottom-most row removed by the last clearLines
+
+    function int cols() { return 10; }
+    function int rows() { return 20; }
+
+    constructor Board new() {
+        var int r;
+        let grid = Array.new(Board.rows());
+        let rowFill = Array.new(Board.rows());
+        let spare = Array.new(4);
+        let r = 0;
+        while (r < Board.rows()) {
+            let grid[r] = Array.new(Board.cols());
+            let r = r + 1;
+        }
+        do clear();
+        return this;
+    }
+
+    method void dispose() {
+        var int r;
+        var Array row;
+        let r = 0;
+        while (r < Board.rows()) {
+            let row = grid[r];
+            do row.dispose();
+            let r = r + 1;
+        }
+        do grid.dispose();
+        do rowFill.dispose();
+        do spare.dispose();
+        do Memory.deAlloc(this);
+        return;
+    }
+
+    /** Empties every cell. */
+    method void clear() {
+        var int r;
+        let r = 0;
+        while (r < Board.rows()) {
+            do Board.zeroRow(grid[r]);
+            let rowFill[r] = 0;
+            let r = r + 1;
+        }
+        let clearedLow = -1;
+        return;
+    }
+
+    /** Blanks one row array. */
+    function void zeroRow(Array row) {
+        var int c;
+        let c = 0;
+        while (c < Board.cols()) {
+            let row[c] = 0;
+            let c = c + 1;
+        }
+        return;
+    }
+
+    /**
+     * True if a piece may occupy this cell.
+     *
+     * Note the asymmetry: a cell to the left, to the right or below the well is
+     * a wall, but a cell *above* the well is free space. A piece spawns up there
+     * and a rotation can nudge it up, and refusing those would make pieces
+     * unable to spin at the top of a tall stack.
+     *
+     * The tests are written as separate ifs rather than one condition joined by
+     * &, because Jack's & does not short-circuit: a single combined test would
+     * index grid[row] even when row is out of range.
+     */
+    method boolean isFree(int col, int row) {
+        var Array cells;
+        if (col < 0) { return false; }
+        if (~(col < Board.cols())) { return false; }
+        if (~(row < Board.rows())) { return false; }
+        if (row < 0) { return true; }
+        let cells = grid[row];
+        return cells[col] = 0;
+    }
+
+    /**
+     * Settles one block into the well.
+     *
+     * A block locked above the top of the well has nowhere to go and is dropped
+     * on the floor; that only happens when the player has already lost, and the
+     * game is about to notice.
+     */
+    method void setCell(int col, int row, int kind) {
+        var Array cells;
+        if (row < 0) { return; }
+        let cells = grid[row];
+        if (cells[col] = 0) {
+            let rowFill[row] = rowFill[row] + 1;
+        }
+        let cells[col] = kind + 1;
+        return;
+    }
+
+    /** True if at least one row is complete. */
+    method boolean hasFullRows() {
+        var int r, full;
+        let full = Board.cols();
+        let r = 0;
+        while (r < Board.rows()) {
+            if (rowFill[r] = full) { return true; }
+            let r = r + 1;
+        }
+        return false;
+    }
+
+    /**
+     * Removes every complete row, closes the gap, and returns how many went.
+     *
+     * No cell is ever copied. Because each row is its own Array object, the rows
+     * that survive are simply re-pointered further down the grid, and the arrays
+     * belonging to the deleted rows are blanked and re-pointered to the top of
+     * the well. Clearing four lines therefore moves at most 20 pointers instead
+     * of shuffling 200 cells, and -- just as usefully -- allocates nothing, so a
+     * long game cannot run the heap down.
+     *
+     * The scan runs bottom-to-top with a separate read and write cursor, the
+     * standard way to compact an array in place.
+     */
+    method int clearLines() {
+        var int read, write, removed, i, full;
+
+        let full = Board.cols();
+        let read = Board.rows() - 1;
+        let write = read;
+        let removed = 0;
+        let clearedLow = -1;
+
+        while (read > -1) {
+            if (rowFill[read] = full) {
+                // The first full row we meet is the bottom-most one, and that is
+                // the lowest row the screen will need repainting from.
+                if (clearedLow < 0) { let clearedLow = read; }
+                let spare[removed] = grid[read];
+                let removed = removed + 1;
+            } else {
+                let grid[write] = grid[read];
+                let rowFill[write] = rowFill[read];
+                let write = write - 1;
+            }
+            let read = read - 1;
+        }
+
+        // Whatever space is left at the top gets the recycled arrays, blanked.
+        let i = 0;
+        while (i < removed) {
+            do Board.zeroRow(spare[i]);
+            let grid[write] = spare[i];
+            let rowFill[write] = 0;
+            let write = write - 1;
+            let i = i + 1;
+        }
+
+        return removed;
+    }
+
+    /** Bottom-most row removed by the last clearLines, or -1 if none was. */
+    method int lowestCleared() { return clearedLow; }
+
+    /**
+     * Repaints rows fromRow..toRow inclusive.
+     *
+     * After a line clear only the rows at or above the lowest cleared row have
+     * moved, so the game repaints that range and leaves the untouched rows below
+     * it alone -- which on a tall stack is most of the work saved.
+     */
+    method void renderRows(int fromRow, int toRow) {
+        var int r, c, width, value;
+        var Array cells;
+        let width = Board.cols();
+        let r = fromRow;
+        while (~(r > toRow)) {
+            let cells = grid[r];
+            let c = 0;
+            while (c < width) {
+                let value = cells[c];
+                if (value = 0) {
+                    do Blocks.eraseBoardCell(c, r);
+                } else {
+                    do Blocks.drawBoardCell(c, r, value - 1);
+                }
+                let c = c + 1;
+            }
+            let r = r + 1;
+        }
+        return;
+    }
+
+    /**
+     * Blinks the completed rows before they vanish.
+     *
+     * Purely cosmetic, and worth it: without the pause a four-line clear is a
+     * single frame of blocks disappearing, and the player never gets to see the
+     * thing they were aiming for.
+     */
+    method void flashFullRows(int times) {
+        var int t;
+        let t = 0;
+        while (t < times) {
+            do paintFullRows(false);
+            do Sys.wait(70);
+            do paintFullRows(true);
+            do Sys.wait(70);
+            let t = t + 1;
+        }
+        return;
+    }
+
+    /** Fills the complete rows with one solid colour. */
+    method void paintFullRows(boolean black) {
+        var int r, full, left, right;
+        let full = Board.cols();
+        let left = Blocks.colToX(0);
+        let right = Blocks.colToX(full - 1) + 11;
+        do Screen.setColor(black);
+        let r = 0;
+        while (r < Board.rows()) {
+            if (rowFill[r] = full) {
+                do Screen.drawRectangle(left, Blocks.rowToY(r),
+                                        right, Blocks.rowToY(r) + 11);
+            }
+            let r = r + 1;
+        }
+        return;
+    }
+}

@@ -1,0 +1,104 @@
+/**
+ * Hud -- the panel to the right of the well.
+ *
+ * Layout, in character cells (the font is 8 by 11, so column 18 is x = 144 and
+ * the well ends at x = 128):
+ *
+ *      row  0   col 18   the PAUSED banner, blank while playing
+ *      row  1   col 18   the title
+ *      rows 3,4          SCORE and its value
+ *      rows 6,7          LINES and its value
+ *      rows 9,10         LEVEL and its value
+ *      row 12            NEXT (col 18) and HOLD (col 33)
+ *      rows 13..17       the two 48-by-48 preview boxes, drawn in pixels
+ *      rows 18..20       the controls
+ *      row 22            a credit line
+ *
+ * Every piece of fixed text is built once, in init(), and kept in a static.
+ * That is not premature tidiness: a string constant in Jack allocates a new
+ * String every time it is evaluated and nothing ever frees it, so rebuilding
+ * this panel at the start of each game would leak a few hundred words per game.
+ * Built once, replaying costs nothing.
+ */
+class Hud {
+
+    static String tTitle, tScore, tLines, tLevel, tNext, tHold;
+    static String tKeys1, tKeys2, tKeys3, tCredit, tPaused;
+
+    function void init() {
+        let tTitle  = "J A C K   T E T R I S";
+        let tScore  = "SCORE";
+        let tLines  = "LINES";
+        let tLevel  = "LEVEL";
+        let tNext   = "NEXT";
+        let tHold   = "HOLD";
+        let tKeys1  = "MOVE   LEFT / RIGHT     ROTATE  UP / Z";
+        let tKeys2  = "DROP   DOWN / SPACE     HOLD    C";
+        let tKeys3  = "PAUSE  P                QUIT    Q";
+        let tCredit = "nand2tetris  -  project 9";
+        let tPaused = "* * *   P A U S E D   * * *";
+        return;
+    }
+
+    /** Draws everything about the panel that never changes. */
+    function void drawStatic() {
+        do Blocks.drawWellFrame();
+
+        do Text.print(1, 18, tTitle);
+        do Text.print(3, 18, tScore);
+        do Text.print(6, 18, tLines);
+        do Text.print(9, 18, tLevel);
+        do Text.print(12, 18, tNext);
+        do Text.print(12, 33, tHold);
+
+        do Blocks.drawBoxFrame(146, 143, 52, 52);   // the NEXT well
+        do Blocks.drawBoxFrame(266, 143, 52, 52);   // the HOLD well
+
+        do Text.print(18, 18, tKeys1);
+        do Text.print(19, 18, tKeys2);
+        do Text.print(20, 18, tKeys3);
+        do Text.print(22, 18, tCredit);
+        return;
+    }
+
+    /**
+     * The three counters. Each is printed with trailing blanks so that a number
+     * which has just got shorter -- which cannot happen to these three, but can
+     * to the level when a new game starts -- does not leave a stale digit.
+     */
+    function void drawScore(int value) {
+        do Text.printNumber(4, 20, value, 6);
+        return;
+    }
+
+    function void drawLines(int value) {
+        do Text.printNumber(7, 20, value, 6);
+        return;
+    }
+
+    function void drawLevel(int value) {
+        do Text.printNumber(10, 20, value, 6);
+        return;
+    }
+
+    /** The preview boxes. A kind of -1 clears the box. */
+    function void drawNext(int kind) {
+        do Blocks.drawPieceBox(148, 145, kind);
+        return;
+    }
+
+    function void drawHold(int kind) {
+        do Blocks.drawPieceBox(268, 145, kind);
+        return;
+    }
+
+    /** Shows or hides the paused banner on row 0. */
+    function void showPaused(boolean on) {
+        if (on) {
+            do Text.print(0, 18, tPaused);
+        } else {
+            do Text.clearRun(0, 18, 27);
+        }
+        return;
+    }
+}

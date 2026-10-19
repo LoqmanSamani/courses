@@ -1,0 +1,1152 @@
+function TetrisGame.frameMs 0
+push constant 10
+return
+function TetrisGame.firstRepeat 0
+push constant 9
+return
+function TetrisGame.nextRepeat 0
+push constant 3
+return
+function TetrisGame.lockDelay 0
+push constant 12
+return
+function TetrisGame.maxLockResets 0
+push constant 8
+return
+function TetrisGame.new 0
+push constant 20
+call Memory.alloc 1
+pop pointer 0
+call Screen.clearScreen 0
+pop temp 0
+call Board.new 0
+pop this 0
+call Piece.new 0
+pop this 1
+push argument 0
+call Randomizer.new 1
+pop this 2
+push constant 8
+call Array.new 1
+pop this 15
+push constant 8
+call Array.new 1
+pop this 16
+push constant 0
+pop this 3
+push constant 0
+pop this 4
+push constant 1
+pop this 5
+push constant 1
+neg
+pop this 7
+push constant 0
+pop this 8
+push constant 0
+pop this 13
+push constant 0
+pop this 14
+push constant 0
+pop this 17
+push constant 0
+not
+pop this 18
+push constant 0
+pop this 19
+push pointer 0
+call TetrisGame.setSpeed 1
+pop temp 0
+call Hud.drawStatic 0
+pop temp 0
+push constant 0
+call Hud.drawScore 1
+pop temp 0
+push constant 0
+call Hud.drawLines 1
+pop temp 0
+push constant 1
+call Hud.drawLevel 1
+pop temp 0
+push constant 1
+neg
+call Hud.drawHold 1
+pop temp 0
+push this 2
+call Randomizer.next 1
+pop this 6
+push pointer 0
+call TetrisGame.spawn 1
+pop temp 0
+push pointer 0
+return
+function TetrisGame.dispose 0
+push argument 0
+pop pointer 0
+push this 0
+call Board.dispose 1
+pop temp 0
+push this 1
+call Piece.dispose 1
+pop temp 0
+push this 2
+call Randomizer.dispose 1
+pop temp 0
+push this 15
+call Array.dispose 1
+pop temp 0
+push this 16
+call Array.dispose 1
+pop temp 0
+push pointer 0
+call Memory.deAlloc 1
+pop temp 0
+push constant 0
+return
+function TetrisGame.getScore 0
+push argument 0
+pop pointer 0
+push this 3
+return
+function TetrisGame.getLines 0
+push argument 0
+pop pointer 0
+push this 4
+return
+function TetrisGame.getLevel 0
+push argument 0
+pop pointer 0
+push this 5
+return
+function TetrisGame.quitRequested 0
+push argument 0
+pop pointer 0
+push this 19
+return
+function TetrisGame.run 1
+push argument 0
+pop pointer 0
+label WHILE_EXP0
+push this 18
+push this 19
+not
+and
+not
+if-goto WHILE_END0
+call Keyboard.keyPressed 0
+pop local 0
+push local 0
+push constant 0
+eq
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+pop this 14
+goto IF_END0
+label IF_FALSE0
+push local 0
+push this 13
+eq
+not
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push pointer 0
+push local 0
+push constant 0
+not
+call TetrisGame.handleKey 3
+pop temp 0
+call TetrisGame.firstRepeat 0
+pop this 14
+goto IF_END1
+label IF_FALSE1
+push this 14
+push constant 1
+sub
+pop this 14
+push this 14
+push constant 1
+lt
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push pointer 0
+push local 0
+push constant 0
+call TetrisGame.handleKey 3
+pop temp 0
+call TetrisGame.nextRepeat 0
+pop this 14
+label IF_FALSE2
+label IF_END1
+label IF_END0
+push local 0
+pop this 13
+push this 18
+push this 19
+not
+and
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push pointer 0
+call TetrisGame.gravity 1
+pop temp 0
+label IF_FALSE3
+call TetrisGame.frameMs 0
+call Sys.wait 1
+pop temp 0
+goto WHILE_EXP0
+label WHILE_END0
+push constant 0
+return
+function TetrisGame.handleKey 0
+push argument 0
+pop pointer 0
+push argument 1
+push constant 130
+eq
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push pointer 0
+push constant 1
+neg
+call TetrisGame.slide 2
+pop temp 0
+push constant 0
+return
+label IF_FALSE0
+push argument 1
+push constant 132
+eq
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push pointer 0
+push constant 1
+call TetrisGame.slide 2
+pop temp 0
+push constant 0
+return
+label IF_FALSE1
+push argument 1
+push constant 133
+eq
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push pointer 0
+call TetrisGame.softDrop 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE2
+push argument 2
+not
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push constant 0
+return
+label IF_FALSE3
+push argument 1
+push constant 131
+eq
+if-goto IF_TRUE4
+goto IF_FALSE4
+label IF_TRUE4
+push pointer 0
+push constant 1
+call TetrisGame.spin 2
+pop temp 0
+push constant 0
+return
+label IF_FALSE4
+push argument 1
+push constant 90
+eq
+if-goto IF_TRUE5
+goto IF_FALSE5
+label IF_TRUE5
+push pointer 0
+push constant 1
+neg
+call TetrisGame.spin 2
+pop temp 0
+push constant 0
+return
+label IF_FALSE5
+push argument 1
+push constant 122
+eq
+if-goto IF_TRUE6
+goto IF_FALSE6
+label IF_TRUE6
+push pointer 0
+push constant 1
+neg
+call TetrisGame.spin 2
+pop temp 0
+push constant 0
+return
+label IF_FALSE6
+push argument 1
+push constant 32
+eq
+if-goto IF_TRUE7
+goto IF_FALSE7
+label IF_TRUE7
+push pointer 0
+call TetrisGame.hardDrop 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE7
+push argument 1
+push constant 67
+eq
+if-goto IF_TRUE8
+goto IF_FALSE8
+label IF_TRUE8
+push pointer 0
+call TetrisGame.hold 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE8
+push argument 1
+push constant 99
+eq
+if-goto IF_TRUE9
+goto IF_FALSE9
+label IF_TRUE9
+push pointer 0
+call TetrisGame.hold 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE9
+push argument 1
+push constant 80
+eq
+if-goto IF_TRUE10
+goto IF_FALSE10
+label IF_TRUE10
+push pointer 0
+call TetrisGame.pause 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE10
+push argument 1
+push constant 112
+eq
+if-goto IF_TRUE11
+goto IF_FALSE11
+label IF_TRUE11
+push pointer 0
+call TetrisGame.pause 1
+pop temp 0
+push constant 0
+return
+label IF_FALSE11
+push argument 1
+push constant 81
+eq
+if-goto IF_TRUE12
+goto IF_FALSE12
+label IF_TRUE12
+push constant 0
+not
+pop this 19
+push constant 0
+return
+label IF_FALSE12
+push argument 1
+push constant 113
+eq
+if-goto IF_TRUE13
+goto IF_FALSE13
+label IF_TRUE13
+push constant 0
+not
+pop this 19
+push constant 0
+return
+label IF_FALSE13
+push constant 0
+return
+function TetrisGame.slide 0
+push argument 0
+pop pointer 0
+push this 1
+push this 0
+push argument 1
+push constant 0
+call Piece.tryMove 4
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push pointer 0
+call TetrisGame.refresh 1
+pop temp 0
+push pointer 0
+call TetrisGame.renewLockDelay 1
+pop temp 0
+label IF_FALSE0
+push constant 0
+return
+function TetrisGame.spin 0
+push argument 0
+pop pointer 0
+push this 1
+push this 0
+push argument 1
+call Piece.tryRotate 3
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push pointer 0
+call TetrisGame.refresh 1
+pop temp 0
+push pointer 0
+call TetrisGame.renewLockDelay 1
+pop temp 0
+label IF_FALSE0
+push constant 0
+return
+function TetrisGame.softDrop 0
+push argument 0
+pop pointer 0
+push this 1
+push this 0
+push constant 0
+push constant 1
+call Piece.tryMove 4
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push pointer 0
+push constant 1
+call TetrisGame.addScore 2
+pop temp 0
+push pointer 0
+call TetrisGame.refresh 1
+pop temp 0
+push this 9
+pop this 10
+push constant 1
+neg
+pop this 11
+label IF_FALSE0
+push constant 0
+return
+function TetrisGame.hardDrop 2
+push argument 0
+pop pointer 0
+push this 1
+push this 0
+call Piece.dropDistance 2
+pop local 0
+push local 0
+push constant 0
+gt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push this 1
+push this 0
+push constant 0
+push local 0
+call Piece.tryMove 4
+pop local 1
+push pointer 0
+push local 0
+push local 0
+add
+call TetrisGame.addScore 2
+pop temp 0
+push pointer 0
+call TetrisGame.refresh 1
+pop temp 0
+label IF_FALSE0
+push pointer 0
+call TetrisGame.lockPiece 1
+pop temp 0
+push constant 0
+return
+function TetrisGame.hold 1
+push argument 0
+pop pointer 0
+push this 8
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push pointer 0
+call TetrisGame.eraseShown 1
+pop temp 0
+push this 7
+pop local 0
+push this 1
+call Piece.getKind 1
+pop this 7
+push this 7
+call Hud.drawHold 1
+pop temp 0
+push local 0
+push constant 0
+lt
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push this 1
+push this 6
+call Piece.spawn 2
+pop temp 0
+push this 2
+call Randomizer.next 1
+pop this 6
+push this 6
+call Hud.drawNext 1
+pop temp 0
+goto IF_END1
+label IF_FALSE1
+push this 1
+push local 0
+call Piece.spawn 2
+pop temp 0
+label IF_END1
+push constant 0
+not
+pop this 8
+push pointer 0
+call TetrisGame.restartPieceTimers 1
+pop temp 0
+push pointer 0
+call TetrisGame.showNewPiece 1
+pop temp 0
+push constant 0
+return
+function TetrisGame.pause 0
+push argument 0
+pop pointer 0
+push constant 0
+not
+call Hud.showPaused 1
+pop temp 0
+call Screens.waitForRelease 0
+pop temp 0
+call Screens.waitForKey 0
+pop temp 0
+call Screens.waitForRelease 0
+pop temp 0
+push constant 0
+call Hud.showPaused 1
+pop temp 0
+push constant 0
+return
+function TetrisGame.gravity 1
+push argument 0
+pop pointer 0
+push this 1
+push this 0
+call Piece.canFall 2
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push this 11
+push constant 0
+lt
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+call TetrisGame.lockDelay 0
+pop this 11
+label IF_FALSE1
+push this 11
+push constant 1
+sub
+pop this 11
+push this 11
+push constant 1
+lt
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push pointer 0
+call TetrisGame.lockPiece 1
+pop temp 0
+label IF_FALSE2
+push constant 0
+return
+label IF_FALSE0
+push constant 1
+neg
+pop this 11
+push this 10
+push constant 1
+sub
+pop this 10
+push this 10
+push constant 1
+lt
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push this 1
+push this 0
+push constant 0
+push constant 1
+call Piece.tryMove 4
+pop local 0
+push this 9
+pop this 10
+push pointer 0
+call TetrisGame.refresh 1
+pop temp 0
+label IF_FALSE3
+push constant 0
+return
+function TetrisGame.renewLockDelay 0
+push argument 0
+pop pointer 0
+push this 11
+push constant 1
+neg
+gt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push this 12
+call TetrisGame.maxLockResets 0
+lt
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+call TetrisGame.lockDelay 0
+pop this 11
+push this 12
+push constant 1
+add
+pop this 12
+label IF_FALSE1
+label IF_FALSE0
+push constant 0
+return
+function TetrisGame.lockPiece 1
+push argument 0
+pop pointer 0
+push pointer 0
+call TetrisGame.settleShown 1
+pop temp 0
+push this 1
+push this 0
+call Piece.lockInto 2
+pop temp 0
+push constant 0
+pop this 17
+push this 0
+call Board.hasFullRows 1
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push this 0
+push constant 2
+call Board.flashFullRows 2
+pop temp 0
+push this 0
+call Board.clearLines 1
+pop local 0
+push this 0
+push constant 0
+push this 0
+call Board.lowestCleared 1
+call Board.renderRows 3
+pop temp 0
+push this 4
+push local 0
+add
+pop this 4
+push pointer 0
+push local 0
+call TetrisGame.lineScore 1
+push this 5
+call Math.multiply 2
+call TetrisGame.addScore 2
+pop temp 0
+push this 4
+call Hud.drawLines 1
+pop temp 0
+push this 4
+call TetrisGame.levelFor 1
+push this 5
+gt
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push this 4
+call TetrisGame.levelFor 1
+pop this 5
+push pointer 0
+call TetrisGame.setSpeed 1
+pop temp 0
+push this 5
+call Hud.drawLevel 1
+pop temp 0
+label IF_FALSE1
+label IF_FALSE0
+push pointer 0
+call TetrisGame.spawn 1
+pop temp 0
+push constant 0
+return
+function TetrisGame.spawn 0
+push argument 0
+pop pointer 0
+push this 1
+push this 6
+call Piece.spawn 2
+pop temp 0
+push this 2
+call Randomizer.next 1
+pop this 6
+push this 6
+call Hud.drawNext 1
+pop temp 0
+push constant 0
+pop this 8
+push pointer 0
+call TetrisGame.restartPieceTimers 1
+pop temp 0
+push pointer 0
+call TetrisGame.showNewPiece 1
+pop temp 0
+push constant 0
+return
+function TetrisGame.restartPieceTimers 0
+push argument 0
+pop pointer 0
+push this 9
+pop this 10
+push constant 1
+neg
+pop this 11
+push constant 0
+pop this 12
+push constant 0
+pop this 17
+push constant 0
+return
+function TetrisGame.showNewPiece 0
+push argument 0
+pop pointer 0
+push this 1
+push this 0
+call Piece.fits 2
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push pointer 0
+call TetrisGame.refresh 1
+pop temp 0
+goto IF_END0
+label IF_FALSE0
+push constant 0
+pop this 18
+label IF_END0
+push constant 0
+return
+function TetrisGame.refresh 4
+push argument 0
+pop pointer 0
+push pointer 0
+call TetrisGame.eraseShown 1
+pop temp 0
+push this 1
+push this 0
+call Piece.dropDistance 2
+pop local 1
+push constant 0
+pop local 0
+label WHILE_EXP0
+push local 0
+push constant 4
+lt
+not
+if-goto WHILE_END0
+push this 1
+push local 0
+call Piece.cellCol 2
+pop local 2
+push this 1
+push local 0
+call Piece.cellRow 2
+pop local 3
+push local 0
+push constant 2
+call Math.multiply 2
+push this 15
+add
+push local 2
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+push local 0
+push constant 2
+call Math.multiply 2
+push constant 1
+add
+push this 15
+add
+push local 3
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+push local 0
+push constant 2
+call Math.multiply 2
+push this 16
+add
+push local 2
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+push local 0
+push constant 2
+call Math.multiply 2
+push constant 1
+add
+push this 16
+add
+push local 3
+push local 1
+add
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+push local 0
+push constant 1
+add
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+push constant 0
+pop local 0
+label WHILE_EXP1
+push local 0
+push constant 8
+lt
+not
+if-goto WHILE_END1
+push local 0
+push this 16
+add
+pop pointer 1
+push that 0
+push local 0
+push constant 1
+add
+push this 16
+add
+pop pointer 1
+push that 0
+call Blocks.drawGhostCell 2
+pop temp 0
+push local 0
+push constant 2
+add
+pop local 0
+goto WHILE_EXP1
+label WHILE_END1
+push constant 0
+pop local 0
+label WHILE_EXP2
+push local 0
+push constant 8
+lt
+not
+if-goto WHILE_END2
+push local 0
+push this 15
+add
+pop pointer 1
+push that 0
+push local 0
+push constant 1
+add
+push this 15
+add
+pop pointer 1
+push that 0
+push this 1
+call Piece.getKind 1
+call Blocks.drawBoardCell 3
+pop temp 0
+push local 0
+push constant 2
+add
+pop local 0
+goto WHILE_EXP2
+label WHILE_END2
+push constant 0
+not
+pop this 17
+push constant 0
+return
+function TetrisGame.eraseShown 1
+push argument 0
+pop pointer 0
+push this 17
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push constant 0
+pop local 0
+label WHILE_EXP0
+push local 0
+push constant 8
+lt
+not
+if-goto WHILE_END0
+push local 0
+push this 16
+add
+pop pointer 1
+push that 0
+push local 0
+push constant 1
+add
+push this 16
+add
+pop pointer 1
+push that 0
+call Blocks.eraseGhostCell 2
+pop temp 0
+push local 0
+push constant 2
+add
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+push constant 0
+pop local 0
+label WHILE_EXP1
+push local 0
+push constant 8
+lt
+not
+if-goto WHILE_END1
+push local 0
+push this 15
+add
+pop pointer 1
+push that 0
+push local 0
+push constant 1
+add
+push this 15
+add
+pop pointer 1
+push that 0
+call Blocks.eraseBoardCell 2
+pop temp 0
+push local 0
+push constant 2
+add
+pop local 0
+goto WHILE_EXP1
+label WHILE_END1
+push constant 0
+pop this 17
+push constant 0
+return
+function TetrisGame.settleShown 1
+push argument 0
+pop pointer 0
+push this 17
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push constant 0
+pop local 0
+label WHILE_EXP0
+push local 0
+push constant 8
+lt
+not
+if-goto WHILE_END0
+push local 0
+push this 16
+add
+pop pointer 1
+push that 0
+push local 0
+push constant 1
+add
+push this 16
+add
+pop pointer 1
+push that 0
+call Blocks.eraseGhostCell 2
+pop temp 0
+push local 0
+push constant 2
+add
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+push constant 0
+pop local 0
+label WHILE_EXP1
+push local 0
+push constant 8
+lt
+not
+if-goto WHILE_END1
+push local 0
+push this 15
+add
+pop pointer 1
+push that 0
+push local 0
+push constant 1
+add
+push this 15
+add
+pop pointer 1
+push that 0
+push this 1
+call Piece.getKind 1
+call Blocks.drawBoardCell 3
+pop temp 0
+push local 0
+push constant 2
+add
+pop local 0
+goto WHILE_EXP1
+label WHILE_END1
+push constant 0
+return
+function TetrisGame.addScore 0
+push argument 0
+pop pointer 0
+push constant 32767
+push this 3
+sub
+push argument 1
+lt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 32767
+pop this 3
+goto IF_END0
+label IF_FALSE0
+push this 3
+push argument 1
+add
+pop this 3
+label IF_END0
+push this 3
+call Hud.drawScore 1
+pop temp 0
+push constant 0
+return
+function TetrisGame.lineScore 0
+push argument 0
+push constant 1
+eq
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 100
+return
+label IF_FALSE0
+push argument 0
+push constant 2
+eq
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push constant 300
+return
+label IF_FALSE1
+push argument 0
+push constant 3
+eq
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push constant 500
+return
+label IF_FALSE2
+push argument 0
+push constant 4
+eq
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push constant 800
+return
+label IF_FALSE3
+push constant 0
+return
+function TetrisGame.levelFor 1
+push argument 0
+push constant 10
+call Math.divide 2
+push constant 1
+add
+pop local 0
+push local 0
+push constant 15
+gt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 15
+pop local 0
+label IF_FALSE0
+push local 0
+return
+function TetrisGame.setSpeed 0
+push argument 0
+pop pointer 0
+push constant 32
+push this 5
+push constant 1
+sub
+push constant 2
+call Math.multiply 2
+sub
+pop this 9
+push this 9
+push constant 4
+lt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 4
+pop this 9
+label IF_FALSE0
+push constant 0
+return

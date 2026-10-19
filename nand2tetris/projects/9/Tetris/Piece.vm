@@ -1,0 +1,393 @@
+function Piece.new 0
+push constant 6
+call Memory.alloc 1
+pop pointer 0
+push constant 8
+call Array.new 1
+pop this 4
+push constant 8
+call Array.new 1
+pop this 5
+push constant 1
+neg
+pop this 0
+push pointer 0
+return
+function Piece.dispose 0
+push argument 0
+pop pointer 0
+push this 4
+call Array.dispose 1
+pop temp 0
+push this 5
+call Array.dispose 1
+pop temp 0
+push pointer 0
+call Memory.deAlloc 1
+pop temp 0
+push constant 0
+return
+function Piece.spawn 0
+push argument 0
+pop pointer 0
+push argument 1
+pop this 0
+push constant 0
+pop this 1
+call Board.cols 0
+push constant 4
+sub
+push constant 2
+call Math.divide 2
+pop this 2
+push constant 0
+pop this 3
+push this 0
+push this 1
+push this 4
+call Shapes.cells 3
+pop temp 0
+push constant 0
+return
+function Piece.getKind 0
+push argument 0
+pop pointer 0
+push this 0
+return
+function Piece.cellCol 0
+push argument 0
+pop pointer 0
+push this 2
+push argument 1
+push constant 2
+call Math.multiply 2
+push this 4
+add
+pop pointer 1
+push that 0
+add
+return
+function Piece.cellRow 0
+push argument 0
+pop pointer 0
+push this 3
+push argument 1
+push constant 2
+call Math.multiply 2
+push constant 1
+add
+push this 4
+add
+pop pointer 1
+push that 0
+add
+return
+function Piece.fitsAt 1
+push argument 0
+pop pointer 0
+push this 0
+push argument 4
+push this 5
+call Shapes.cells 3
+pop temp 0
+push constant 0
+pop local 0
+label WHILE_EXP0
+push local 0
+push constant 8
+lt
+not
+if-goto WHILE_END0
+push argument 1
+push argument 2
+push local 0
+push this 5
+add
+pop pointer 1
+push that 0
+add
+push argument 3
+push local 0
+push constant 1
+add
+push this 5
+add
+pop pointer 1
+push that 0
+add
+call Board.isFree 3
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push local 0
+push constant 2
+add
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+push constant 0
+not
+return
+function Piece.fits 0
+push argument 0
+pop pointer 0
+push pointer 0
+push argument 1
+push this 2
+push this 3
+push this 1
+call Piece.fitsAt 5
+return
+function Piece.canFall 0
+push argument 0
+pop pointer 0
+push pointer 0
+push argument 1
+push this 2
+push this 3
+push constant 1
+add
+push this 1
+call Piece.fitsAt 5
+return
+function Piece.tryMove 0
+push argument 0
+pop pointer 0
+push pointer 0
+push argument 1
+push this 2
+push argument 2
+add
+push this 3
+push argument 3
+add
+push this 1
+call Piece.fitsAt 5
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push this 2
+push argument 2
+add
+pop this 2
+push this 3
+push argument 3
+add
+pop this 3
+push constant 0
+not
+return
+label IF_FALSE0
+push constant 0
+return
+function Piece.tryRotate 4
+push argument 0
+pop pointer 0
+push this 1
+push argument 2
+add
+pop local 0
+push local 0
+push constant 0
+lt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 3
+pop local 0
+label IF_FALSE0
+push local 0
+push constant 3
+gt
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push constant 0
+pop local 0
+label IF_FALSE1
+push constant 0
+pop local 1
+label WHILE_EXP0
+push local 1
+push constant 6
+lt
+not
+if-goto WHILE_END0
+push local 1
+call Piece.kickX 1
+pop local 2
+push local 1
+call Piece.kickY 1
+pop local 3
+push pointer 0
+push argument 1
+push this 2
+push local 2
+add
+push this 3
+push local 3
+add
+push local 0
+call Piece.fitsAt 5
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push this 2
+push local 2
+add
+pop this 2
+push this 3
+push local 3
+add
+pop this 3
+push local 0
+pop this 1
+push this 0
+push this 1
+push this 4
+call Shapes.cells 3
+pop temp 0
+push constant 0
+not
+return
+label IF_FALSE2
+push local 1
+push constant 1
+add
+pop local 1
+goto WHILE_EXP0
+label WHILE_END0
+push constant 0
+return
+function Piece.kickX 0
+push argument 0
+push constant 0
+eq
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+return
+label IF_FALSE0
+push argument 0
+push constant 1
+eq
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push constant 1
+neg
+return
+label IF_FALSE1
+push argument 0
+push constant 2
+eq
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push constant 1
+return
+label IF_FALSE2
+push argument 0
+push constant 3
+eq
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push constant 2
+neg
+return
+label IF_FALSE3
+push argument 0
+push constant 4
+eq
+if-goto IF_TRUE4
+goto IF_FALSE4
+label IF_TRUE4
+push constant 2
+return
+label IF_FALSE4
+push constant 0
+return
+function Piece.kickY 0
+push argument 0
+push constant 5
+eq
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 1
+neg
+return
+label IF_FALSE0
+push constant 0
+return
+function Piece.dropDistance 1
+push argument 0
+pop pointer 0
+push constant 0
+pop local 0
+label WHILE_EXP0
+push pointer 0
+push argument 1
+push this 2
+push this 3
+push local 0
+push constant 1
+add
+add
+push this 1
+call Piece.fitsAt 5
+not
+if-goto WHILE_END0
+push local 0
+push constant 1
+add
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+push local 0
+return
+function Piece.lockInto 1
+push argument 0
+pop pointer 0
+push constant 0
+pop local 0
+label WHILE_EXP0
+push local 0
+push constant 8
+lt
+not
+if-goto WHILE_END0
+push argument 1
+push this 2
+push local 0
+push this 4
+add
+pop pointer 1
+push that 0
+add
+push this 3
+push local 0
+push constant 1
+add
+push this 4
+add
+pop pointer 1
+push that 0
+add
+push this 0
+call Board.setCell 4
+pop temp 0
+push local 0
+push constant 2
+add
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+push constant 0
+return

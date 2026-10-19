@@ -1,0 +1,167 @@
+/**
+ * Shapes -- the static geometry of the seven tetrominoes.
+ *
+ * A tetromino is four cells inside a 4-by-4 box, and each piece has four
+ * rotations, so the whole game needs 7 * 4 = 28 little pictures. Spelling those
+ * out as coordinate lists would mean 224 numbers; instead each picture is packed
+ * into a single integer used as a bitmap of the box:
+ *
+ *      bit index = (row * 4) + column          bit set = cell occupied
+ *
+ *      bits  0  1  2  3           . # . .
+ *            4  5  6  7           . # . .      bits 1, 5, 9, 13
+ *            8  9 10 11     -->   . # . .      = 2 + 32 + 512 + 8192
+ *           12 13 14 15           . # . .      = 8738
+ *
+ * That turns the entire shape table into 28 integers, and it works because Jack
+ * gives us a bitwise & on integers even though it has no shift operator: the
+ * powers of two we need are built once, by doubling, into the `bits` array.
+ *
+ * Kinds are numbered 0..6 in the order I, O, T, S, Z, J, L. The rotations are
+ * the standard ones used by modern Tetris, so the pieces spin the way players
+ * expect them to.
+ */
+class Shapes {
+
+    static Array masks;   // 28 bitmaps: masks[(kind * 4) + rotation]
+    static Array bits;    // bits[i] = 2^i, for testing bit i of a bitmap
+
+    /** Number of distinct pieces. */
+    function int kindCount() { return 7; }
+
+    /**
+     * Builds the two lookup tables. Must be called once before anything else
+     * in the program touches a piece.
+     */
+    function void init() {
+        var int i, power;
+
+        // bits[i] = 2^i, by repeated doubling. The last entry, 2^15, overflows
+        // a signed 16-bit integer and comes out as -32768 -- but the *bit
+        // pattern* is still 1000000000000000, which is all & cares about, so
+        // the overflow is harmless rather than a bug to work around.
+        let bits = Array.new(16);
+        let power = 1;
+        let i = 0;
+        while (i < 16) {
+            let bits[i] = power;
+            let power = power + power;
+            let i = i + 1;
+        }
+
+        let masks = Array.new(28);
+
+        // ---- 0: I ---------------------------------------------------------
+        //   ....    ..#.    ....    .#..
+        //   ####    ..#.    ....    .#..
+        //   ....    ..#.    ####    .#..
+        //   ....    ..#.    ....    .#..
+        let masks[0]  = 240;
+        let masks[1]  = 17476;
+        let masks[2]  = 3840;
+        let masks[3]  = 8738;
+
+        // ---- 1: O ---------------------------------------------------------
+        //   ....    ....    ....    ....
+        //   .##.    .##.    .##.    .##.
+        //   .##.    .##.    .##.    .##.
+        //   ....    ....    ....    ....
+        // The square looks the same from every angle, so all four entries are
+        // equal and a rotation never moves it.
+        let masks[4]  = 1632;
+        let masks[5]  = 1632;
+        let masks[6]  = 1632;
+        let masks[7]  = 1632;
+
+        // ---- 2: T ---------------------------------------------------------
+        //   .#..    .#..    ....    .#..
+        //   ###.    .##.    ###.    ##..
+        //   ....    .#..    .#..    .#..
+        let masks[8]  = 114;
+        let masks[9]  = 610;
+        let masks[10] = 624;
+        let masks[11] = 562;
+
+        // ---- 3: S ---------------------------------------------------------
+        //   .##.    .#..    ....    #...
+        //   ##..    .##.    .##.    ##..
+        //   ....    ..#.    ##..    .#..
+        let masks[12] = 54;
+        let masks[13] = 1122;
+        let masks[14] = 864;
+        let masks[15] = 561;
+
+        // ---- 4: Z ---------------------------------------------------------
+        //   ##..    ..#.    ....    .#..
+        //   .##.    .##.    ##..    ##..
+        //   ....    .#..    .##.    #...
+        let masks[16] = 99;
+        let masks[17] = 612;
+        let masks[18] = 1584;
+        let masks[19] = 306;
+
+        // ---- 5: J ---------------------------------------------------------
+        //   #...    .##.    ....    .#..
+        //   ###.    .#..    ###.    .#..
+        //   ....    .#..    ..#.    ##..
+        let masks[20] = 113;
+        let masks[21] = 550;
+        let masks[22] = 1136;
+        let masks[23] = 802;
+
+        // ---- 6: L ---------------------------------------------------------
+        //   ..#.    .#..    ....    ##..
+        //   ###.    .#..    ###.    .#..
+        //   ....    .##.    #...    .#..
+        let masks[24] = 116;
+        let masks[25] = 1570;
+        let masks[26] = 368;
+        let masks[27] = 547;
+
+        return;
+    }
+
+    /**
+     * Unpacks a rotation into four (column, row) offsets, written into `out` as
+     * eight integers: dc0, dr0, dc1, dr1, dc2, dr2, dc3, dr3.
+     *
+     * The caller supplies the array so that this can be used inside the game
+     * loop without allocating -- Jack has no garbage collector, so a routine
+     * called sixty times a second must not create objects.
+     *
+     * The loop stops as soon as four cells have been found, which on average
+     * saves about a third of the bit tests.
+     */
+    function void cells(int kind, int rotation, Array out) {
+        var int mask, i, n;
+
+        let mask = masks[(kind * 4) + rotation];
+        let i = 0;
+        let n = 0;
+        while ((i < 16) & (n < 8)) {
+            if (~((mask & bits[i]) = 0)) {
+                let out[n] = i - ((i / 4) * 4);   // column = i mod 4
+                let out[n + 1] = i / 4;           // row    = i div 4
+                let n = n + 2;
+            }
+            let i = i + 1;
+        }
+        return;
+    }
+
+    /**
+     * The character code of a kind's letter, for the title screen's legend.
+     *
+     * A code rather than a String, because returning "I" would allocate a new
+     * String object on every call and Jack never frees one.
+     */
+    function int letterCode(int kind) {
+        if (kind = 0) { return 73; }    // I
+        if (kind = 1) { return 79; }    // O
+        if (kind = 2) { return 84; }    // T
+        if (kind = 3) { return 83; }    // S
+        if (kind = 4) { return 90; }    // Z
+        if (kind = 5) { return 74; }    // J
+        return 76;                      // L
+    }
+}

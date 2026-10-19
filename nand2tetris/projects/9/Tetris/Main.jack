@@ -1,0 +1,62 @@
+/**
+ * Jack Tetris -- project 9 of nand2tetris.
+ *
+ * A complete game of Tetris for the Hack computer: ten columns by twenty rows,
+ * the seven standard tetrominoes with the four standard rotations, wall kicks,
+ * a landing shadow, a next-piece preview, a hold box, soft and hard drops,
+ * fifteen levels of gravity and the standard scoring table.
+ *
+ * The classes, roughly outside-in:
+ *
+ *      Main         this file: set up, then play until the player stops
+ *      Screens      the title and game-over screens
+ *      TetrisGame   one game: the loop, the rules, the keyboard, the score
+ *      Board        the well -- which cells are full, and clearing lines
+ *      Piece        the falling tetromino -- moving, turning, wall kicks
+ *      Shapes       the 28 rotations, packed one to an integer
+ *      Blocks       pixels: board-to-screen coordinates and the block patterns
+ *      Hud          the panel beside the well
+ *      Randomizer   which piece comes next, dealt from a shuffled bag
+ *      Text         small helpers for writing on the character grid
+ *
+ * The three init() calls below build lookup tables and the fixed strings. They
+ * have to run before anything else, and in no particular order among
+ * themselves, because none of them touches another class.
+ */
+class Main {
+
+    function void main() {
+        var int seed;
+        var boolean playing;
+        var TetrisGame game;
+
+        do Shapes.init();
+        do Blocks.init();
+        do Hud.init();
+        do Screens.init();
+
+        let playing = true;
+        while (playing) {
+            // The title screen hands back a seed drawn from how long the player
+            // took to press Enter -- the only unpredictable quantity on a
+            // machine with no clock.
+            let seed = Screens.splash();
+
+            let game = TetrisGame.new(seed);
+            do game.run();
+
+            if (game.quitRequested()) {
+                let playing = false;
+            } else {
+                let playing = Screens.gameOver(game.getScore(),
+                                               game.getLines(),
+                                               game.getLevel());
+            }
+            do game.dispose();
+        }
+
+        do Screen.clearScreen();
+        do Text.printCentred(11, "THANKS FOR PLAYING");
+        return;
+    }
+}

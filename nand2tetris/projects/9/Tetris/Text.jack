@@ -1,0 +1,64 @@
+/**
+ * Text -- small helpers for writing on the character grid.
+ *
+ * The Hack screen is 512 by 256 pixels and the OS font is 8 wide by 11 tall, so
+ * the character grid is 64 columns by 23 rows. Character column c starts at
+ * x = 8c and row r starts at y = 11r; the game keeps all of its text at column
+ * 18 or beyond (x = 144) so that it can never collide with the well, which ends
+ * at x = 128.
+ */
+class Text {
+
+    /** Writes s with its first character at (row, col). */
+    function void print(int row, int col, String s) {
+        do Output.moveCursor(row, col);
+        do Output.printString(s);
+        return;
+    }
+
+    /** Writes s centred on the 64-column grid. */
+    function void printCentred(int row, String s) {
+        do Output.moveCursor(row, (64 - s.length()) / 2);
+        do Output.printString(s);
+        return;
+    }
+
+    /**
+     * Writes n spaces at the cursor.
+     *
+     * This looks clumsy next to a string constant like "    ", and it is on
+     * purpose. Every time Jack evaluates a string constant it allocates a fresh
+     * String on the heap, and Jack has no garbage collector, so nothing is ever
+     * given back. A literal inside anything that repeats -- a score that keeps
+     * changing, a banner that blinks -- would quietly eat the 14K heap over the
+     * course of a long game. Printing characters allocates nothing.
+     */
+    function void blanks(int n) {
+        var int i;
+        let i = 0;
+        while (i < n) {
+            do Output.printChar(32);
+            let i = i + 1;
+        }
+        return;
+    }
+
+    /**
+     * Writes a number at (row, col) followed by `pad` spaces, which rub out
+     * whatever longer number used to be there. Repainting just the digits is far
+     * cheaper than clearing a region of the screen.
+     */
+    function void printNumber(int row, int col, int value, int pad) {
+        do Output.moveCursor(row, col);
+        do Output.printInt(value);
+        do Text.blanks(pad);
+        return;
+    }
+
+    /** Blanks `n` columns starting at (row, col). */
+    function void clearRun(int row, int col, int n) {
+        do Output.moveCursor(row, col);
+        do Text.blanks(n);
+        return;
+    }
+}

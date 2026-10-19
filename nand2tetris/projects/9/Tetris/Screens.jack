@@ -1,0 +1,161 @@
+/**
+ * Screens -- the full-screen states: the title screen and the game-over screen.
+ *
+ * Both of them block until the player presses something, and both build their
+ * text once in init() for the reason explained in Hud: a Jack string constant
+ * allocates every time it is evaluated, and these screens are revisited every
+ * time a game is replayed.
+ */
+class Screens {
+
+    static String sTitle, sSub, sLegend1, sLegend2;
+    static String sK1a, sK1b, sK2a, sK2b, sK3a, sK3b;
+    static String sStart, sOver, sScore, sLines, sLevel, sAgain;
+    static String sRank1, sRank2, sRank3, sRank4;
+
+    function void init() {
+        let sTitle   = "J A C K   T E T R I S";
+        let sSub     = "a tetromino game built on a 16-bit computer";
+        let sLegend1 = "THE SEVEN PIECES";
+        let sLegend2 = "each piece has its own fill pattern, not its own colour";
+
+        let sK1a = "LEFT / RIGHT  move";
+        let sK1b = "UP or Z  rotate";
+        let sK2a = "DOWN  soft drop";
+        let sK2b = "SPACE    hard drop";
+        let sK3a = "C  hold piece";
+        let sK3b = "P  pause   Q  quit";
+
+        let sStart = "PRESS ENTER TO PLAY";
+        let sOver  = "G A M E   O V E R";
+        let sScore = "SCORE";
+        let sLines = "LINES";
+        let sLevel = "LEVEL";
+        let sAgain = "ENTER  play again        Q  quit";
+
+        let sRank1 = "room for improvement";
+        let sRank2 = "not bad at all";
+        let sRank3 = "a good game";
+        let sRank4 = "T E T R I S   M A S T E R";
+        return;
+    }
+
+    /**
+     * The title screen. Draws the legend of block patterns, blinks a prompt, and
+     * returns a seed for the random generator.
+     *
+     * That seed is the number of times the blink loop ran before the player hit
+     * Enter. The Hack computer has no clock and no other source of entropy, so
+     * human reaction time is the only unpredictable quantity available -- and it
+     * is a good one, since the loop runs about fifty times a second and nobody
+     * presses a key on a reproducible tick.
+     */
+    function int splash() {
+        var int ticks, key, i, labelCol;
+        var boolean prompt;
+
+        do Screen.clearScreen();
+        do Blocks.drawBoxFrame(0, 0, 512, 256);
+
+        do Text.printCentred(2, sTitle);
+        do Text.printCentred(4, sSub);
+        do Text.printCentred(6, sLegend1);
+        do Text.printCentred(7, sLegend2);
+
+        // One of each piece, drawn with its own pattern, with its letter under
+        // it. The boxes are 48 wide and 52 apart, starting at x = 70, so the
+        // seven of them are centred across the screen.
+        let i = 0;
+        while (i < Shapes.kindCount()) {
+            do Blocks.drawPieceBox(70 + (i * 52), 100, i);
+            let labelCol = (94 + (i * 52)) / 8;      // centre of the box, in columns
+            do Output.moveCursor(14, labelCol);
+            do Output.printChar(Shapes.letterCode(i));
+            let i = i + 1;
+        }
+
+        do Text.print(16, 10, sK1a);
+        do Text.print(16, 38, sK1b);
+        do Text.print(17, 10, sK2a);
+        do Text.print(17, 38, sK2b);
+        do Text.print(18, 10, sK3a);
+        do Text.print(18, 38, sK3b);
+
+        let ticks = 0;
+        let key = 0;
+        let prompt = false;
+        while (~(key = 128)) {                       // 128 is newline / Enter
+            let key = Keyboard.keyPressed();
+            // Toggle the prompt every 24 ticks, which at 20 ms a tick is about
+            // twice a second.
+            if ((ticks - ((ticks / 24) * 24)) = 0) {
+                let prompt = ~prompt;
+                if (prompt) {
+                    do Text.printCentred(20, sStart);
+                } else {
+                    do Text.clearRun(20, (64 - sStart.length()) / 2, sStart.length());
+                }
+            }
+            let ticks = ticks + 1;
+            do Sys.wait(20);
+        }
+        do Screens.waitForRelease();
+        return ticks;
+    }
+
+    /**
+     * The game-over screen. Returns true if the player wants another game.
+     */
+    function boolean gameOver(int score, int lines, int level) {
+        var int key;
+
+        do Screen.clearScreen();
+        do Blocks.drawBoxFrame(0, 0, 512, 256);
+
+        do Text.printCentred(4, sOver);
+
+        do Text.print(8, 24, sScore);
+        do Text.printNumber(8, 32, score, 2);
+        do Text.print(9, 24, sLines);
+        do Text.printNumber(9, 32, lines, 2);
+        do Text.print(10, 24, sLevel);
+        do Text.printNumber(10, 32, level, 2);
+
+        do Text.printCentred(13, Screens.rank(score));
+        do Text.printCentred(17, sAgain);
+
+        // Wait for a decision. Any key other than Q means "again".
+        let key = Screens.waitForKey();
+        do Screens.waitForRelease();
+        if (key = 81)  { return false; }     // Q
+        if (key = 113) { return false; }     // q
+        return true;
+    }
+
+    /** A closing remark, chosen from the final score. */
+    function String rank(int score) {
+        if (score < 600)   { return sRank1; }
+        if (score < 2500)  { return sRank2; }
+        if (score < 7000)  { return sRank3; }
+        return sRank4;
+    }
+
+    /** Blocks until no key is held. */
+    function void waitForRelease() {
+        while (~(Keyboard.keyPressed() = 0)) {
+            do Sys.wait(20);
+        }
+        return;
+    }
+
+    /** Blocks until a key is pressed, and returns it. */
+    function int waitForKey() {
+        var int key;
+        let key = 0;
+        while (key = 0) {
+            let key = Keyboard.keyPressed();
+            do Sys.wait(20);
+        }
+        return key;
+    }
+}

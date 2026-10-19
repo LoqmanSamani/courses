@@ -1,0 +1,92 @@
+function Main.main 3
+call Shapes.init 0
+pop temp 0
+call Blocks.init 0
+pop temp 0
+call Hud.init 0
+pop temp 0
+call Screens.init 0
+pop temp 0
+push constant 0
+not
+pop local 1
+label WHILE_EXP0
+push local 1
+not
+if-goto WHILE_END0
+call Screens.splash 0
+pop local 0
+push local 0
+call TetrisGame.new 1
+pop local 2
+push local 2
+call TetrisGame.run 1
+pop temp 0
+push local 2
+call TetrisGame.quitRequested 1
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+pop local 1
+goto IF_END0
+label IF_FALSE0
+push local 2
+call TetrisGame.getScore 1
+push local 2
+call TetrisGame.getLines 1
+push local 2
+call TetrisGame.getLevel 1
+call Screens.gameOver 3
+pop local 1
+label IF_END0
+push local 2
+call TetrisGame.dispose 1
+pop temp 0
+goto WHILE_EXP0
+label WHILE_END0
+call Screen.clearScreen 0
+pop temp 0
+push constant 11
+push constant 18
+call String.new 1
+push constant 84
+call String.appendChar 2
+push constant 72
+call String.appendChar 2
+push constant 65
+call String.appendChar 2
+push constant 78
+call String.appendChar 2
+push constant 75
+call String.appendChar 2
+push constant 83
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 70
+call String.appendChar 2
+push constant 79
+call String.appendChar 2
+push constant 82
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 80
+call String.appendChar 2
+push constant 76
+call String.appendChar 2
+push constant 65
+call String.appendChar 2
+push constant 89
+call String.appendChar 2
+push constant 73
+call String.appendChar 2
+push constant 78
+call String.appendChar 2
+push constant 71
+call String.appendChar 2
+call Text.printCentred 2
+pop temp 0
+push constant 0
+return

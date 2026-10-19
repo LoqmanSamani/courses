@@ -1,0 +1,169 @@
+/**
+ * Piece -- the tetromino that is currently falling.
+ *
+ * A piece is four numbers: which kind it is, which of the four rotations it is
+ * in, and where the top-left corner of its 4-by-4 box sits on the board. The
+ * four occupied cells are kept unpacked in `cells` so that drawing and
+ * collision testing do not have to decode the bitmap every time.
+ *
+ * Piece owns all of the geometry and Board owns the occupancy, so every question
+ * about whether a move is legal is answered here by asking the board about four
+ * individual cells. Neither class needs to know how the other works.
+ */
+class Piece {
+
+    field int kind;      // 0..6, an index into the Shapes table
+    field int rot;       // 0..3
+    field int col;       // board column of the left edge of the 4-by-4 box
+    field int row;       // board row of the top edge of the 4-by-4 box
+    field Array cells;   // the four occupied cells, as dc,dr pairs
+    field Array probe;   // scratch space for testing a move before making it
+
+    constructor Piece new() {
+        let cells = Array.new(8);
+        let probe = Array.new(8);
+        let kind = -1;
+        return this;
+    }
+
+    method void dispose() {
+        do cells.dispose();
+        do probe.dispose();
+        do Memory.deAlloc(this);
+        return;
+    }
+
+    /**
+     * Puts a fresh piece of the given kind at the top of the well, centred.
+     *
+     * The 4-by-4 box is four columns wide, so on a ten-column board it starts at
+     * column 3 and the piece appears over the middle of the well.
+     */
+    method void spawn(int newKind) {
+        let kind = newKind;
+        let rot = 0;
+        let col = (Board.cols() - 4) / 2;
+        let row = 0;
+        do Shapes.cells(kind, rot, cells);
+        return;
+    }
+
+    method int getKind() { return kind; }
+
+    /** Board column of the i'th occupied cell, i = 0..3. */
+    method int cellCol(int i) { return col + cells[i * 2]; }
+
+    /** Board row of the i'th occupied cell, i = 0..3. */
+    method int cellRow(int i) { return row + cells[(i * 2) + 1]; }
+
+    /**
+     * Could this piece sit at (c, r) in rotation `ro` without clashing?
+     *
+     * The hypothetical rotation is unpacked into `probe` rather than into
+     * `cells`, so a failed test leaves the real piece untouched.
+     */
+    method boolean fitsAt(Board b, int c, int r, int ro) {
+        var int i;
+        do Shapes.cells(kind, ro, probe);
+        let i = 0;
+        while (i < 8) {
+            if (~(b.isFree(c + probe[i], r + probe[i + 1]))) {
+                return false;
+            }
+            let i = i + 2;
+        }
+        return true;
+    }
+
+    /** Is the piece legally placed where it is now? (Used to detect a top-out.) */
+    method boolean fits(Board b) {
+        return fitsAt(b, col, row, rot);
+    }
+
+    /** Is there room for the piece one row further down? */
+    method boolean canFall(Board b) {
+        return fitsAt(b, col, row + 1, rot);
+    }
+
+    /** Moves by (dc, dr) if that is legal. Returns whether it moved. */
+    method boolean tryMove(Board b, int dc, int dr) {
+        if (fitsAt(b, col + dc, row + dr, rot)) {
+            let col = col + dc;
+            let row = row + dr;
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Turns the piece: dir = 1 clockwise, dir = -1 anticlockwise.
+     *
+     * A rotation that does not fit is not simply refused. The piece is nudged a
+     * cell or two sideways, and as a last resort up, and the rotation is retried
+     * from there. These "wall kicks" are what let a piece spin while it is
+     * pressed against a wall or wedged in a narrow gap -- without them, rotation
+     * near the edges feels broken, and the two-cell nudge is specifically what
+     * the four-long I piece needs.
+     *
+     * Returns whether the piece turned.
+     */
+    method boolean tryRotate(Board b, int dir) {
+        var int target, attempt, dx, dy;
+
+        let target = rot + dir;
+        if (target < 0) { let target = 3; }
+        if (target > 3) { let target = 0; }
+
+        let attempt = 0;
+        while (attempt < 6) {
+            let dx = Piece.kickX(attempt);
+            let dy = Piece.kickY(attempt);
+            if (fitsAt(b, col + dx, row + dy, target)) {
+                let col = col + dx;
+                let row = row + dy;
+                let rot = target;
+                do Shapes.cells(kind, rot, cells);
+                return true;
+            }
+            let attempt = attempt + 1;
+        }
+        return false;
+    }
+
+    /** Sideways nudges tried when a rotation does not fit, in order. */
+    function int kickX(int attempt) {
+        if (attempt = 0) { return 0; }
+        if (attempt = 1) { return -1; }
+        if (attempt = 2) { return 1; }
+        if (attempt = 3) { return -2; }
+        if (attempt = 4) { return 2; }
+        return 0;
+    }
+
+    /** The matching vertical nudges: only the last attempt lifts the piece. */
+    function int kickY(int attempt) {
+        if (attempt = 5) { return -1; }
+        return 0;
+    }
+
+    /** How many rows the piece can fall before something stops it. */
+    method int dropDistance(Board b) {
+        var int d;
+        let d = 0;
+        while (fitsAt(b, col, row + (d + 1), rot)) {
+            let d = d + 1;
+        }
+        return d;
+    }
+
+    /** Settles the four cells into the board. */
+    method void lockInto(Board b) {
+        var int i;
+        let i = 0;
+        while (i < 8) {
+            do b.setCell(col + cells[i], row + cells[i + 1], kind);
+            let i = i + 2;
+        }
+        return;
+    }
+}

@@ -1,0 +1,223 @@
+/**
+ * Blocks -- everything this game knows about pixels.
+ *
+ * Two jobs live here. The first is translating board coordinates (column 0..9,
+ * row 0..19) into screen coordinates. The second is drawing a single block.
+ *
+ * THE TEXTURE TRICK
+ * -----------------
+ * On a real Tetris screen the seven pieces are told apart by colour. The Hack
+ * screen has exactly one colour, so instead every kind gets its own fill
+ * pattern inside a 12-by-12 cell. The patterns are chosen to echo the way the
+ * pieces themselves are related:
+ *
+ *      I  solid                    the only piece that is a straight line
+ *      O  hollow                   the only piece that never rotates
+ *      T  a dot in the middle      the piece with a centre
+ *      S  horizontal bars      \   S and Z are reflections of each other,
+ *      Z  vertical bars        /   so their patterns are the same bars turned
+ *      J  diagonal, down-right \   J and L are reflections of each other,
+ *      L  diagonal, down-left  /   so their patterns are mirrored diagonals
+ *
+ * so the legend on the title screen is almost unnecessary once you have played
+ * one game. Every pattern is drawn with at most four filled rectangles, which
+ * matters: the moving piece is erased and redrawn on every frame it changes.
+ *
+ * All of the pattern offsets below are written for a 12-pixel cell. That is the
+ * one number in the program that other numbers depend on, so it is named here
+ * and nowhere else.
+ */
+class Blocks {
+
+    static int cellPx;    // edge length of one cell, in pixels
+    static int originX;   // x of the left edge of column 0
+    static int originY;   // y of the top edge of row 0
+    static Array scratch; // reusable cell list, for the preview boxes
+
+    /**
+     * Fixes the geometry of the well.
+     *
+     * 10 columns of 12 pixels is 120 pixels wide and 20 rows is 240 tall, which
+     * with a two-pixel frame leaves the well occupying x 3..128 and y 2..247 --
+     * comfortably inside the 512-by-256 screen and clear of the text panel,
+     * which starts at character column 18, that is x = 144.
+     */
+    function void init() {
+        let cellPx = 12;
+        let originX = 6;
+        let originY = 5;
+        let scratch = Array.new(8);
+        return;
+    }
+
+    /** Screen x of the left edge of a board column. */
+    function int colToX(int col) { return originX + (col * cellPx); }
+
+    /** Screen y of the top edge of a board row. */
+    function int rowToY(int row) { return originY + (row * cellPx); }
+
+    /**
+     * Draws one block of the given kind with its top-left corner at (x, y).
+     *
+     * Every block starts life as a solid square and is then hollowed out, which
+     * leaves a one-pixel black outline. That outline is what keeps a wall of
+     * blocks from melting into one black mass.
+     */
+    function void drawCell(int x, int y, int kind) {
+        do Screen.setColor(true);
+        do Screen.drawRectangle(x, y, x + 11, y + 11);
+
+        if (kind = 0) {                 // I -- solid, so leave it filled
+            return;
+        }
+
+        do Screen.setColor(false);
+        do Screen.drawRectangle(x + 1, y + 1, x + 10, y + 10);
+        do Screen.setColor(true);
+
+        if (kind = 1) {                 // O -- hollow
+            return;
+        }
+        if (kind = 2) {                 // T -- centre square
+            do Screen.drawRectangle(x + 3, y + 3, x + 8, y + 8);
+            return;
+        }
+        if (kind = 3) {                 // S -- two horizontal bars
+            do Screen.drawRectangle(x + 1, y + 2, x + 10, y + 4);
+            do Screen.drawRectangle(x + 1, y + 7, x + 10, y + 9);
+            return;
+        }
+        if (kind = 4) {                 // Z -- the same bars, turned upright
+            do Screen.drawRectangle(x + 2, y + 1, x + 4, y + 10);
+            do Screen.drawRectangle(x + 7, y + 1, x + 9, y + 10);
+            return;
+        }
+        if (kind = 5) {                 // J -- diagonal, top-left to bottom-right
+            do Screen.drawRectangle(x + 1, y + 1, x + 5, y + 5);
+            do Screen.drawRectangle(x + 6, y + 6, x + 10, y + 10);
+            return;
+        }
+        // kind = 6                     // L -- the mirror diagonal
+        do Screen.drawRectangle(x + 6, y + 1, x + 10, y + 5);
+        do Screen.drawRectangle(x + 1, y + 6, x + 5, y + 10);
+        return;
+    }
+
+    /** Wipes one block-sized square back to white. */
+    function void eraseCell(int x, int y) {
+        do Screen.setColor(false);
+        do Screen.drawRectangle(x, y, x + 11, y + 11);
+        return;
+    }
+
+    /**
+     * The board-coordinate versions of the two routines above.
+     *
+     * Rows above the top of the well are legal places for a piece to be -- it
+     * spawns there, and a rotation can push it up by one -- but there is no
+     * screen there, so those cells are silently skipped. Doing the check in one
+     * place keeps every caller from having to remember it.
+     */
+    function void drawBoardCell(int col, int row, int kind) {
+        if (row < 0) { return; }
+        do Blocks.drawCell(Blocks.colToX(col), Blocks.rowToY(row), kind);
+        return;
+    }
+
+    function void eraseBoardCell(int col, int row) {
+        if (row < 0) { return; }
+        do Blocks.eraseCell(Blocks.colToX(col), Blocks.rowToY(row));
+        return;
+    }
+
+    /**
+     * The landing shadow: a single two-pixel dot in the middle of a cell.
+     *
+     * Four of these show the player exactly where the falling piece will come to
+     * rest. A dot was chosen over the usual dotted outline for two reasons: an
+     * outline would be easy to mistake for the hollow O block, and a dot is one
+     * rectangle instead of four, which keeps the per-frame cost down.
+     */
+    function void drawGhostCell(int col, int row) {
+        var int x, y;
+        if (row < 0) { return; }
+        let x = Blocks.colToX(col);
+        let y = Blocks.rowToY(row);
+        do Screen.setColor(true);
+        do Screen.drawRectangle(x + 5, y + 5, x + 6, y + 6);
+        return;
+    }
+
+    function void eraseGhostCell(int col, int row) {
+        var int x, y;
+        if (row < 0) { return; }
+        let x = Blocks.colToX(col);
+        let y = Blocks.rowToY(row);
+        do Screen.setColor(false);
+        do Screen.drawRectangle(x + 4, y + 4, x + 7, y + 7);
+        return;
+    }
+
+    /** A two-pixel black frame around a w-by-h box with its corner at (x, y). */
+    function void drawBoxFrame(int x, int y, int w, int h) {
+        do Screen.setColor(true);
+        do Screen.drawRectangle(x, y, (x + w) - 1, (y + h) - 1);
+        do Screen.setColor(false);
+        do Screen.drawRectangle(x + 2, y + 2, (x + w) - 3, (y + h) - 3);
+        return;
+    }
+
+    /** The frame around the well itself. */
+    function void drawWellFrame() {
+        do Blocks.drawBoxFrame(3, 2, 126, 246);
+        return;
+    }
+
+    /**
+     * Draws a piece centred in a 48-by-48 box, used by the NEXT and HOLD
+     * previews. A kind of -1 means "empty", which just clears the box.
+     *
+     * Centring is worth the arithmetic: three of the seven pieces are three
+     * cells wide and would sit visibly off to one side if they were simply
+     * drawn at the box's corner.
+     */
+    function void drawPieceBox(int x0, int y0, int kind) {
+        var int i, minCol, maxCol, minRow, maxRow, c, r, offX, offY;
+
+        do Screen.setColor(false);
+        do Screen.drawRectangle(x0, y0, x0 + 47, y0 + 47);
+        if (kind < 0) {
+            return;
+        }
+
+        do Shapes.cells(kind, 0, scratch);
+
+        // Bounding box of the four cells.
+        let minCol = 4;
+        let maxCol = -1;
+        let minRow = 4;
+        let maxRow = -1;
+        let i = 0;
+        while (i < 8) {
+            let c = scratch[i];
+            let r = scratch[i + 1];
+            if (c < minCol) { let minCol = c; }
+            if (c > maxCol) { let maxCol = c; }
+            if (r < minRow) { let minRow = r; }
+            if (r > maxRow) { let maxRow = r; }
+            let i = i + 2;
+        }
+
+        // Shift so that the bounding box, not the 4-by-4 box, is centred.
+        let offX = (x0 + ((48 - (((maxCol - minCol) + 1) * 12)) / 2)) - (minCol * 12);
+        let offY = (y0 + ((48 - (((maxRow - minRow) + 1) * 12)) / 2)) - (minRow * 12);
+
+        let i = 0;
+        while (i < 8) {
+            do Blocks.drawCell(offX + (scratch[i] * 12),
+                               offY + (scratch[i + 1] * 12), kind);
+            let i = i + 2;
+        }
+        return;
+    }
+}
