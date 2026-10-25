@@ -3,6 +3,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -75,7 +76,7 @@ public class JackTokenizer {
     /** Reads a .jack file and splits it into tokens. */
     public JackTokenizer(Path jackFile) throws IOException {
         this.fileName = jackFile.getFileName().toString();
-        scan(Files.readString(jackFile, StandardCharsets.UTF_8));
+        scan(new String(Files.readAllBytes(jackFile), StandardCharsets.UTF_8));
     }
 
     /** Tokenizes a string directly. Used by the tests. */
@@ -303,7 +304,7 @@ public class JackTokenizer {
 
     /** Every token, in order. Used to write the XxxT.xml token dump. */
     public List<Token> allTokens() {
-        return List.copyOf(tokens);
+        return Collections.unmodifiableList(new ArrayList<Token>(tokens));
     }
 
     private void require(TokenType expected) {

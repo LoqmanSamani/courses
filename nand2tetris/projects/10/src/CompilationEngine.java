@@ -201,12 +201,12 @@ public class CompilationEngine {
         boolean more = true;
         while (more && tokenizer.tokenType() == TokenType.KEYWORD) {
             switch (tokenizer.keyWord()) {
-                case LET    -> compileLet();
-                case IF     -> compileIf();
-                case WHILE  -> compileWhile();
-                case DO     -> compileDo();
-                case RETURN -> compileReturn();
-                default     -> more = false;
+                case LET:    compileLet();    break;
+                case IF:     compileIf();     break;
+                case WHILE:  compileWhile();  break;
+                case DO:     compileDo();     break;
+                case RETURN: compileReturn(); break;
+                default:     more = false;    break;
             }
         }
         xml.close("statements");
@@ -326,9 +326,12 @@ public class CompilationEngine {
         xml.open("term");
 
         switch (tokenizer.tokenType()) {
-            case INT_CONST, STRING_CONST -> emit();
+            case INT_CONST:
+            case STRING_CONST:
+                emit();
+                break;
 
-            case KEYWORD -> {
+            case KEYWORD: {
                 // Only true, false, null and this are terms.
                 Keyword k = tokenizer.keyWord();
                 if (k != Keyword.TRUE && k != Keyword.FALSE
@@ -336,9 +339,10 @@ public class CompilationEngine {
                     throw syntaxError("a term");
                 }
                 emit();
+                break;
             }
 
-            case SYMBOL -> {
+            case SYMBOL: {
                 char c = tokenizer.symbol();
                 if (c == '(') {
                     expectSymbol('(');
@@ -350,9 +354,10 @@ public class CompilationEngine {
                 } else {
                     throw syntaxError("a term");
                 }
+                break;
             }
 
-            case IDENTIFIER -> {
+            case IDENTIFIER: {
                 char next = tokenizer.peekSymbol();
                 if (next == '[') {
                     emit();                     // varName
@@ -364,7 +369,12 @@ public class CompilationEngine {
                 } else {
                     emit();                     // a plain variable
                 }
+                break;
             }
+
+            default:
+                // The end of the file, which is not a term.
+                throw syntaxError("a term");
         }
 
         xml.close("term");

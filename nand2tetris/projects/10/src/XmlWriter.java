@@ -85,21 +85,23 @@ public class XmlWriter implements Closeable {
 
     /** The XML element name for each kind of token. */
     private static String tagFor(TokenType type) {
-        return switch (type) {
-            case KEYWORD      -> "keyword";
-            case SYMBOL       -> "symbol";
-            case IDENTIFIER   -> "identifier";
-            case INT_CONST    -> "integerConstant";
-            case STRING_CONST -> "stringConstant";
-            // Never reached: every caller has already rejected the end of the
-            // file before asking for it to be written out.
-            case EOF -> throw new IllegalStateException(
-                    "tried to write the end-of-file marker");
-        };
+        switch (type) {
+            case KEYWORD:      return "keyword";
+            case SYMBOL:       return "symbol";
+            case IDENTIFIER:   return "identifier";
+            case INT_CONST:    return "integerConstant";
+            case STRING_CONST: return "stringConstant";
+            default:
+                // Never reached: every caller has already rejected the end of
+                // the file before asking for it to be written out.
+                throw new IllegalStateException("tried to write the end-of-file marker");
+        }
     }
 
     private void line(String text) throws IOException {
-        out.write(INDENT.repeat(depth));
+        for (int i = 0; i < depth; i++) {
+            out.write(INDENT);
+        }
         out.write(text);
         out.write(EOL);
     }

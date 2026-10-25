@@ -4,6 +4,10 @@ nand2tetris, project 10
 
 Parses Jack source and writes its parse tree as XML.
 
+Written to the Java 8 language level, so it builds on an old JDK as well as a
+current one. Nothing here needs a newer one, and an analyzer that will not
+compile on the grader's JDK is worth nothing however correct it is.
+
     javac *.java
     java JackAnalyzer Prog.jack      # writes Prog.xml and ProgT.xml
     java JackAnalyzer DirName        # does that for every .jack inside
