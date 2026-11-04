@@ -6,28 +6,161 @@
  * This library provides two services: direct access to the computer's main
  * memory (RAM), and allocation and recycling of memory blocks. The Hack RAM
  * consists of 32,768 words, each holding a 16-bit binary number.
- */ 
+ *
+ * THE RAM TRICK
+ * peek and poke need to reach an arbitrary address, and Jack has no pointers.
+ * But it does have arrays, and an array variable is nothing but a base address
+ * -- so setting `ram = 0` makes `ram[i]` mean "word i of the machine". The one
+ * piece of type-cheating in the OS, and it is what makes the rest possible.
+ *
+ * THE HEAP
+ * Blocks live in RAM 2048..16383 and carry a one-word header holding the
+ * block's total size, header included. alloc returns the word after the
+ * header, so deAlloc can find the header again by stepping back one.
+ *
+ *      block ->  [ size ]        <- header, always present
+ *                [ next ]        <- only while the block is free
+ *                [ ...  ]           the payload, which alloc returns a
+ *                [ ...  ]           pointer to
+ *
+ * The free list is kept sorted by address. Sorting costs a walk on every
+ * deAlloc and buys the thing that matters: two free blocks that are physically
+ * adjacent are also adjacent in the list, so they can be merged. Without that
+ * merging, a program that allocates and frees in a loop -- which is to say any
+ * program that uses strings -- saws the heap into ever smaller pieces until a
+ * modest request cannot be satisfied even though most of the heap is free.
+ */
 class Memory {
+
+    static Array ram;          // the whole machine, addressed from 0
+    static int freeList;       // address of the first free block, or 0
+
+    static int HEAP_BASE;
+    static int HEAP_TOP;       // one past the last heap word
 
     /** Initializes the class. */
     function void init() {
+        let ram = 0;
+        let HEAP_BASE = 2048;
+        let HEAP_TOP = 16384;
+
+        // One free block covering the entire heap.
+        let freeList = HEAP_BASE;
+        let ram[freeList] = HEAP_TOP - HEAP_BASE;   // size, header included
+        let ram[freeList + 1] = 0;                  // no next block
+        return;
     }
 
     /** Returns the RAM value at the given address. */
     function int peek(int address) {
+        return ram[address];
     }
 
     /** Sets the RAM value at the given address to the given value. */
     function void poke(int address, int value) {
+        let ram[address] = value;
+        return;
     }
 
-    /** Finds an available RAM block of the given size and returns
-     *  a reference to its base address. */
+    /**
+     * Finds an available RAM block of the given size and returns
+     * a reference to its base address.
+     *
+     * First fit: walk the free list and take the first block big enough. A
+     * best-fit search would waste less space but costs a full walk every time,
+     * and on a machine this small the difference is not worth the instructions.
+     *
+     * A block is split only if the remainder is big enough to be useful -- it
+     * needs a header word plus at least one payload word. Otherwise the few
+     * spare words go to the caller, which is cheaper than tracking a fragment
+     * too small to ever satisfy a request.
+     */
     function int alloc(int size) {
+        var int block, previous, needed, remainder;
+
+        if (size < 1) {
+            do Sys.error(5);    // Allocated memory size must be positive
+        }
+
+        let needed = size + 1;              // payload plus the header word
+        let previous = 0;
+        let block = freeList;
+
+        while (~(block = 0)) {
+            if (~(ram[block] < needed)) {
+                // Big enough. Split it if what is left can stand on its own.
+                let remainder = ram[block] - needed;
+                if (remainder > 1) {
+                    // Keep the tail free; hand out the front.
+                    let ram[block + needed] = remainder;
+                    let ram[block + needed + 1] = ram[block + 1];
+                    do Memory.relink(previous, block + needed);
+                    let ram[block] = needed;
+                } else {
+                    // Take the whole block, remainder and all.
+                    do Memory.relink(previous, ram[block + 1]);
+                }
+                return block + 1;
+            }
+            let previous = block;
+            let block = ram[block + 1];
+        }
+
+        do Sys.error(6);        // Heap overflow
+        return 0;
     }
 
-    /** De-allocates the given object (cast as an array) by making
-     *  it available for future allocations. */
+    /** Points whatever preceded `previous` at `next`: either the list head,
+     *  or the next field of the previous block. */
+    function void relink(int previous, int next) {
+        if (previous = 0) {
+            let freeList = next;
+        } else {
+            let ram[previous + 1] = next;
+        }
+        return;
+    }
+
+    /**
+     * De-allocates the given object (cast as an array) by making
+     * it available for future allocations.
+     *
+     * The block is put back in address order and then merged with its
+     * neighbours if they are free and physically touch it. Merging forward
+     * first and then backward handles the case where a block fills the gap
+     * between two free ones and all three become a single block.
+     */
     function void deAlloc(Array o) {
-    }    
+        var int block, previous, next;
+
+        let block = o - 1;                  // step back over the header
+
+        // Find the place in the address-sorted list.
+        let previous = 0;
+        let next = freeList;
+        while ((~(next = 0)) & (next < block)) {
+            let previous = next;
+            let next = ram[next + 1];
+        }
+
+        let ram[block + 1] = next;
+        do Memory.relink(previous, block);
+
+        // Merge with the following block, if it begins where this one ends.
+        if (~(next = 0)) {
+            if ((block + ram[block]) = next) {
+                let ram[block] = ram[block] + ram[next];
+                let ram[block + 1] = ram[next + 1];
+            }
+        }
+
+        // Merge with the preceding block, on the same test.
+        if (~(previous = 0)) {
+            if ((previous + ram[previous]) = block) {
+                let ram[previous] = ram[previous] + ram[block];
+                let ram[previous + 1] = ram[block + 1];
+            }
+        }
+        return;
+    }
 }

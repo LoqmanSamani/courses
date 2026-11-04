@@ -8,42 +8,191 @@
  *  for representing a two's complement integer value (16 in the Hack computer). 
  *  Note: Jack compilers implement multiplication and division
  *  using calls to OS functions in this class.
+ *
+ *  The Hack ALU can add, negate and compare, and that is all. Everything here
+ *  is built from those three operations, which is why multiplication and
+ *  division are O(n) rather than single instructions -- and why the compiler
+ *  has to turn `x * y` into a function call.
+ *
+ *  Nothing in this class may use * or /, since those are the very operators it
+ *  implements; using one inside multiply would call multiply.
  */
 class Math {
     static int n;             // Number of bits used for representing a two's complement integer
     static Array powersOfTwo; // Stores 2^0, 2^1, 2^2,..., 2^(n-1)
+    static int remainder;     // what divideAbs has left over, carried back up
 
-    // Initializes the Math library.
+    /**
+     * Initializes the Math library.
+     *
+     * The table is built by doubling rather than by multiplying, for the
+     * obvious reason. Its last entry, 2^15, overflows a signed 16-bit integer
+     * and comes out as -32768; the bit pattern is still a single 1 in the top
+     * position, which is all a bit test cares about.
+     */
     function void init() {
+        var int i;
+
+        let n = 16;
+        let powersOfTwo = Array.new(n);
+        let powersOfTwo[0] = 1;
+        let i = 1;
+        while (i < n) {
+            let powersOfTwo[i] = powersOfTwo[i - 1] + powersOfTwo[i - 1];
+            let i = i + 1;
+        }
+        return;
     }
 
-    /** Returns the product of x and y. 
-     *  When a Jack compiler detects the multiplication operator '*'
-     *  in an expression, it handles it by invoking this method. 
-     *  Thus, in Jack, x * y and Math.multiply(x,y) return the same value. */
+    /**
+     * Returns the product of x and y.
+     *
+     * Long multiplication in base 2, which is the algorithm taught in school:
+     * for each digit of y, if it is 1, add x shifted left that far. In base 2
+     * "if the digit is 1" is a bit test and "shifted left" is a doubling, so
+     * no multiplication is needed to implement multiplication.
+     *
+     * The bit test is written out rather than put in a helper. That looks
+     * worse and it matters enormously: a Jack function call costs around
+     * twenty-five VM instructions, and a helper called sixteen times per
+     * multiplication -- with every `*` in every program arriving here --
+     * accounted for most of this operating system's running time before it was
+     * inlined.
+     *
+     * `rest` is y with the bits already handled cleared away, so the loop stops
+     * as soon as nothing is left rather than always running sixteen times.
+     * Small numbers, which is nearly all of them, finish in a few passes. It
+     * works for negative y too: the top bit is worth -32768, subtracting it
+     * clears it like any other, and rest reaches 0 on the last bit.
+     *
+     * Overflow is simply allowed to happen. Both the running sum and the
+     * shifted x wrap modulo 2^16, which gives exactly the low 16 bits of the
+     * true product -- the same answer the hardware would give.
+     */
     function int multiply(int x, int y) {
+        var int sum, shiftedX, mask, rest, i;
+
+        let sum = 0;
+        let shiftedX = x;
+        let mask = 1;
+        let rest = y;
+        let i = 0;
+        while ((i < n) & (~(rest = 0))) {
+            if (~((rest & mask) = 0)) {
+                let sum = sum + shiftedX;
+                let rest = rest - mask;     // this bit is now dealt with
+            }
+            let shiftedX = shiftedX + shiftedX;
+            let mask = mask + mask;
+            let i = i + 1;
+        }
+        return sum;
     }
 
-    /** Returns the integer part of x / y.
-     *  When a Jack compiler detects the division operator '/'
-     *  an an expression, it handles it by invoking this method.
-     *  Thus, x/y and Math.divide(x,y) return the same value. */
+    /**
+     * Returns the integer part of x / y.
+     *
+     * The sign is stripped off first and put back at the end, so the recursion
+     * below only ever sees non-negative numbers.
+     */
     function int divide(int x, int y) {
+        var int result;
+        var boolean negative;
+
+        if (y = 0) {
+            do Sys.error(3);    // Division by zero
+        }
+        let negative = ~((x < 0) = (y < 0));     // the signs differ
+        let result = Math.divideAbs(Math.abs(x), Math.abs(y));
+        if (negative) {
+            return -result;
+        }
+        return result;
     }
 
-    /** Returns the integer part of the square root of x. */
+    /**
+     * Integer division for non-negative x and y.
+     *
+     * The trick is to double the divisor on the way down rather than subtract
+     * it repeatedly, which turns a loop of up to 32767 subtractions into 16
+     * levels of recursion. Each level asks "how many times does 2y go into x?"
+     * and then decides whether one more y fits into what is left over.
+     *
+     * What is left over is carried back up the recursion in `remainder`,
+     * rather than recomputed as x - q*y. The obvious way costs a multiplication
+     * at every level; this way division does no multiplying at all.
+     *
+     * The `y < 0` test is not a sign check -- y is known non-negative. It
+     * catches the doubling overflowing past 32767, which is the signal that the
+     * divisor has grown larger than anything x could contain.
+     */
+    function int divideAbs(int x, int y) {
+        var int q;
+
+        if ((y > x) | (y < 0)) {
+            let remainder = x;
+            return 0;
+        }
+        let q = Math.divideAbs(x, y + y);
+        if (remainder < y) {
+            return q + q;
+        }
+        let remainder = remainder - y;
+        return q + q + 1;
+    }
+
+    /**
+     * Returns the integer part of the square root of x.
+     *
+     * A binary search on the answer, one bit at a time from the top down: for
+     * each bit, try setting it and keep it if the square is still no bigger
+     * than x. Sixteen bits in, eight of which can matter, so eight iterations.
+     *
+     * The `(squared > 0)` guard is the interesting part. A candidate near the
+     * top of the range squares to something past 32767 and wraps negative, and
+     * without the guard that negative value would compare as "not greater than
+     * x" and the bit would be wrongly kept.
+     */
     function int sqrt(int x) {
+        var int y, j, candidate, squared;
+
+        if (x < 0) {
+            do Sys.error(4);    // Cannot compute square root of a negative number
+        }
+        let y = 0;
+        let j = 7;              // (n / 2) - 1
+        while (j > -1) {
+            let candidate = y + powersOfTwo[j];
+            let squared = Math.multiply(candidate, candidate);
+            if ((~(squared > x)) & (squared > 0)) {
+                let y = candidate;
+            }
+            let j = j - 1;
+        }
+        return y;
     }
 
     /** Returns the greater value. */
     function int max(int a, int b) {
+        if (a > b) {
+            return a;
+        }
+        return b;
     }
 
     /** Returns the smaller value. */
     function int min(int a, int b) {
+        if (a < b) {
+            return a;
+        }
+        return b;
     }
 
     /** Returns the absolute value of x. */
     function int abs(int x) {
+        if (x < 0) {
+            return -x;
+        }
+        return x;
     }
 }

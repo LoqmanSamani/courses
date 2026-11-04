@@ -9,14 +9,29 @@
  * syntax arr[i]. Each array entry can hold a primitive data type as 
  * well as any object type. Different array entries can have different 
  * data types.
+ *
+ * There is nothing to this class, and that is the point. A Jack array is not
+ * an object with a header and a length -- it is simply a block of consecutive
+ * words, and `arr[i]` compiles to an address computation rather than to a
+ * method call. So Array.new is a thin alias for Memory.alloc, and the whole
+ * class is two lines of real work.
+ *
+ * Note that `new` is a function, not a constructor: it returns the address
+ * that Memory.alloc chose, rather than allocating an object of its own.
  */
 class Array {
 
     /** Constructs a new Array of the given size. */
     function Array new(int size) {
+        if (size < 1) {
+            do Sys.error(2);    // Array size must be positive
+        }
+        return Memory.alloc(size);
     }
 
     /** Disposes this array. */
     method void dispose() {
+        do Memory.deAlloc(this);
+        return;
     }
 }

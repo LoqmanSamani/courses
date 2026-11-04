@@ -8,20 +8,70 @@
  */
 class Sys {
 
-    /** Performs all the initializations required by the OS. */
+    /**
+     * Performs all the initializations required by the OS.
+     *
+     * This is where a Hack program actually begins: the VM translator's
+     * bootstrap code calls Sys.init, not Main.main.
+     *
+     * The order of the calls below is not arbitrary. Memory must come first,
+     * because everything after it allocates: Math builds a table of powers of
+     * two, Output builds 95 character bitmaps. Screen must precede Output,
+     * since Output draws on a screen that Screen has blanked. Only once the
+     * machine is in a known state is the user's program started.
+     */
     function void init() {
+        do Memory.init();
+        do Math.init();
+        do Screen.init();
+        do Output.init();
+        do Keyboard.init();
+
+        do Main.main();
+        do Sys.halt();
+        return;
     }
 
     /** Halts the program execution. */
     function void halt() {
+        // There is no "stop" instruction on the Hack machine, so halting means
+        // looping forever. The emulator notices the infinite loop and reports
+        // the program as ended.
+        while (true) {
+        }
+        return;
     }
 
-    /** Waits approximately duration milliseconds and returns.  */
+    /**
+     * Waits approximately duration milliseconds and returns.
+     *
+     * With no clock to read, the only way to spend time is to do nothing
+     * slowly. The inner count is a calibration constant: it has no meaning
+     * beyond "about a millisecond of busy work on this machine", and it is the
+     * one number in the OS that is tuned by observation rather than derived.
+     */
     function void wait(int duration) {
+        var int i, j;
+        if (duration < 0) {
+            do Sys.error(1);    // Duration must be positive
+        }
+        let i = 0;
+        while (i < duration) {
+            let j = 0;
+            while (j < 50) {
+                let j = j + 1;
+            }
+            let i = i + 1;
+        }
+        return;
     }
 
     /** Displays the given error code in the form "ERR<errorCode>",
      *  and halts the program's execution. */
     function void error(int errorCode) {
+        do Output.printString("ERR");
+        do Output.printInt(errorCode);
+        do Sys.halt();
+        return;
     }
 }

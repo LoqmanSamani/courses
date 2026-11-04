@@ -4,11 +4,20 @@
 // File name: projects/12/Keyboard.jack
 /**
  * A library for handling user input from the keyboard.
+ *
+ * The keyboard is a single word of memory at address 24576, holding the code
+ * of the key being held down right now, or 0. There is no buffer and no
+ * interrupt: a key that is pressed and released between two reads is simply
+ * never seen. Everything below is built around waiting for that word to change.
  */
 class Keyboard {
 
+    static int KBD;
+
     /** Initializes the keyboard. */
     function void init() {
+        let KBD = 24576;
+        return;
     } 
 
     /**
@@ -32,24 +41,83 @@ class Keyboard {
      * F1 - F12 = 141 - 152
      */
     function char keyPressed() {
+        return Memory.peek(KBD);
     }
 
-    /**	Waits until a key is pressed on the keyboard and released,
-     *  then echoes the key to the screen, and returns the character 
-     *  of the pressed key. */
+    /**
+     * Waits until a key is pressed on the keyboard and released,
+     * then echoes the key to the screen, and returns the character
+     * of the pressed key.
+     *
+     * Waiting for the release as well as the press is what turns a key that is
+     * held down for a tenth of a second -- thousands of reads -- into one
+     * character. The key is captured at the moment of the press, because by the
+     * time the release is seen the keyboard word is already 0.
+     */
     function char readChar() {
+        var char c;
+
+        do Output.printChar(0);                     // the cursor, a black square
+        while (Keyboard.keyPressed() = 0) {
+        }
+        let c = Keyboard.keyPressed();
+        while (~(Keyboard.keyPressed() = 0)) {
+        }
+        do Output.backSpace();                      // erase the cursor
+        return c;
     }
 
-    /**	Displays the message on the screen, reads from the keyboard the entered
-     *  text until a newline character is detected, echoes the text to the screen,
-     *  and returns its value. Also handles user backspaces. */
+    /**
+     * Displays the message on the screen, reads from the keyboard the entered
+     * text until a newline character is detected, echoes the text to the screen,
+     * and returns its value. Also handles user backspaces.
+     *
+     * The echo happens here rather than in readChar, because only this level
+     * knows what a character means: a newline ends the line rather than drawing
+     * a glyph, and a backspace removes a character rather than adding one.
+     */
     function String readLine(String message) {
+        var String line;
+        var char c;
+        var boolean reading;
+
+        do Output.printString(message);
+        let line = String.new(80);
+        let reading = true;
+
+        while (reading) {
+            let c = Keyboard.readChar();
+            if (c = String.newLine()) {
+                do Output.println();
+                let reading = false;
+            } else {
+                if (c = String.backSpace()) {
+                    if (line.length() > 0) {
+                        do line.eraseLastChar();
+                        do Output.backSpace();
+                    }
+                } else {
+                    let line = line.appendChar(c);
+                    do Output.printChar(c);
+                }
+            }
+        }
+        return line;
     }   
 
-    /** Displays the message on the screen, reads from the keyboard the entered
-     *  text until a newline character is detected, echoes the text to the screen,
-     *  and returns its integer value (until the first non-digit character in the
-     *  entered text is detected). Also handles user backspaces. */
+    /**
+     * Displays the message on the screen, reads from the keyboard the entered
+     * text until a newline character is detected, echoes the text to the screen,
+     * and returns its integer value (until the first non-digit character in the
+     * entered text is detected). Also handles user backspaces.
+     */
     function int readInt(String message) {
+        var String line;
+        var int value;
+
+        let line = Keyboard.readLine(message);
+        let value = line.intValue();
+        do line.dispose();          // the text itself is of no further use
+        return value;
     }
 }

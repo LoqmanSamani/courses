@@ -7,36 +7,302 @@
  * The Hack physical screen consists of 512 rows (indexed 0..511, top to bottom)
  * of 256 pixels each (indexed 0..255, left to right). The top left pixel on 
  * the screen is indexed (0,0).
+ *
+ * The screen is 8192 words of memory starting at 16384, 32 words to a row of
+ * 512 pixels, least significant bit leftmost. So a pixel is a bit, and the only
+ * way to set one is to read its word, change the bit and write it back.
+ *
+ * WHY THE WORD-AT-A-TIME CODE EXISTS
+ * Setting one pixel costs a read, a mask and a write. Setting sixteen that
+ * happen to share a word costs the same, if you fill the word directly instead
+ * of touching its bits one by one. Every filled shape here -- rectangles,
+ * circles, the horizontal runs inside them -- goes through drawHorizontal
+ * below, which writes whole words wherever it can and only masks at the two
+ * ragged ends. On a machine where a multiplication is a function call, that is
+ * the difference between a game that animates and one that crawls.
  */
 class Screen {
 
+    static Array screen;        // the screen memory, addressed from 16384
+    static boolean color;       // true = black
+    static Array twoToThe;      // bit masks, 2^0 .. 2^15
+    static Array maskFrom;      // maskFrom[b] has bits b..15 set
+    static Array maskTo;        // maskTo[b]   has bits 0..b  set
+
     /** Initializes the Screen. */
     function void init() {
+        var int i;
+
+        let screen = 16384;
+        let color = true;
+
+        // Screen cannot borrow Math's table: Sys.init starts Math first, but
+        // relying on that ordering from here would be a trap for whoever
+        // changes it. Sixteen words is a cheap price for independence.
+        let twoToThe = Array.new(16);
+        let twoToThe[0] = 1;
+        let i = 1;
+        while (i < 16) {
+            let twoToThe[i] = twoToThe[i - 1] + twoToThe[i - 1];
+            let i = i + 1;
+        }
+
+        // The two ragged ends of a horizontal run need a mask each. Building
+        // them with a loop every time cost more than the drawing did, and
+        // there are only sixteen of each, so they are built once here.
+        let maskFrom = Array.new(16);
+        let maskTo = Array.new(16);
+        let i = 0;
+        while (i < 16) {
+            if (i = 0) {
+                let maskTo[0] = 1;
+            } else {
+                let maskTo[i] = maskTo[i - 1] + twoToThe[i];
+            }
+            let i = i + 1;
+        }
+        let i = 0;
+        while (i < 16) {
+            let maskFrom[i] = ~0;               // every bit set ...
+            if (i > 0) {
+                let maskFrom[i] = ~(maskTo[i - 1]);  // ... minus the ones below i
+            }
+            let i = i + 1;
+        }
+
+        do Screen.clearScreen();
+        return;
     }
 
     /** Erases the entire screen. */
     function void clearScreen() {
+        var int i;
+        let i = 0;
+        while (i < 8192) {
+            let screen[i] = 0;
+            let i = i + 1;
+        }
+        return;
     }
 
     /** Sets the current color, to be used for all subsequent drawXXX commands.
      *  Black is represented by true, white by false. */
     function void setColor(boolean b) {
+        let color = b;
+        return;
     }
 
     /** Draws the (x,y) pixel, using the current color. */
     function void drawPixel(int x, int y) {
+        var int address, mask;
+
+        if ((x < 0) | (x > 511) | (y < 0) | (y > 255)) {
+            do Sys.error(7);    // Illegal pixel coordinates
+        }
+        let address = (y * 32) + (x / 16);
+        let mask = twoToThe[x & 15];        // x mod 16, since 16 is a power of 2
+        if (color) {
+            let screen[address] = screen[address] | mask;
+        } else {
+            let screen[address] = screen[address] & (~mask);
+        }
+        return;
     }
 
-    /** Draws a line from pixel (x1,y1) to pixel (x2,y2), using the current color. */
+    /**
+     * Fills pixels x1..x2 of row y, a whole word at a time where possible.
+     *
+     * Three parts: the ragged left end, a run of complete words, and the ragged
+     * right end. When the whole run sits inside one word there are no complete
+     * words and the two ends are the same word, which is why that case is
+     * handled separately rather than folded into the loop.
+     */
+    function void drawHorizontal(int x1, int x2, int y) {
+        var int leftWord, rightWord, rowBase, address, mask, temp;
+
+        if (x1 > x2) {
+            let temp = x1;
+            let x1 = x2;
+            let x2 = temp;
+        }
+        // Clip to the screen rather than refusing: circles and lines routinely
+        // run a pixel or two past the edge.
+        if (x2 < 0)   { return; }
+        if (x1 > 511) { return; }
+        if ((y < 0) | (y > 255)) { return; }
+        if (x1 < 0)   { let x1 = 0; }
+        if (x2 > 511) { let x2 = 511; }
+
+        let rowBase = y * 32;
+        let leftWord = x1 / 16;
+        let rightWord = x2 / 16;
+
+        if (leftWord = rightWord) {
+            let mask = Screen.maskBetween(x1 & 15, x2 & 15);
+            do Screen.applyMask(rowBase + leftWord, mask);
+            return;
+        }
+
+        // The partial word at the left: bits (x1 mod 16)..15.
+        do Screen.applyMask(rowBase + leftWord, Screen.maskBetween(x1 & 15, 15));
+
+        // The complete words in the middle, written without masking.
+        let address = rowBase + leftWord + 1;
+        while (address < (rowBase + rightWord)) {
+            if (color) {
+                let screen[address] = -1;
+            } else {
+                let screen[address] = 0;
+            }
+            let address = address + 1;
+        }
+
+        // The partial word at the right: bits 0..(x2 mod 16).
+        do Screen.applyMask(rowBase + rightWord, Screen.maskBetween(0, x2 & 15));
+        return;
+    }
+
+    /** A word with bits `from`..`to` set, from the precomputed end masks. */
+    function int maskBetween(int from, int to) {
+        return maskFrom[from] & maskTo[to];
+    }
+
+    /** Sets or clears the masked bits of one word, according to the color. */
+    function void applyMask(int address, int mask) {
+        if (color) {
+            let screen[address] = screen[address] | mask;
+        } else {
+            let screen[address] = screen[address] & (~mask);
+        }
+        return;
+    }
+
+    /**
+     * Draws a line from pixel (x1,y1) to pixel (x2,y2), using the current color.
+     *
+     * Horizontal lines are split off first, not for elegance but because they
+     * are overwhelmingly the common case -- every rectangle is made of them --
+     * and a horizontal line can be filled a word at a time.
+     *
+     * The rest is Bresenham's algorithm. `err` tracks how far the line drawn so
+     * far has strayed from the true line, scaled by dx and dy so that it stays
+     * an integer and no division is ever needed.
+     *
+     * The two ifs below are independent on purpose, and that is the whole
+     * subtlety. A loop that advances one axis OR the other draws a 45-degree
+     * line two pixels thick, because it needs two iterations to move one step
+     * diagonally. Letting both tests fire in the same iteration lets the line
+     * move diagonally in one step, which is what makes it one pixel thick.
+     */
     function void drawLine(int x1, int y1, int x2, int y2) {
+        var int dx, dy, stepX, stepY, err, twiceErr;
+
+        if ((x1 < 0) | (x1 > 511) | (x2 < 0) | (x2 > 511)
+            | (y1 < 0) | (y1 > 255) | (y2 < 0) | (y2 > 255)) {
+            do Sys.error(8);    // Illegal line coordinates
+        }
+
+        if (y1 = y2) {
+            do Screen.drawHorizontal(x1, x2, y1);
+            return;
+        }
+
+        let dx = Math.abs(x2 - x1);
+        let dy = Math.abs(y2 - y1);
+        if (x1 < x2) { let stepX = 1; } else { let stepX = -1; }
+        if (y1 < y2) { let stepY = 1; } else { let stepY = -1; }
+        let err = dx - dy;
+
+        while (true) {
+            do Screen.drawPixel(x1, y1);
+            if ((x1 = x2) & (y1 = y2)) {
+                return;
+            }
+            let twiceErr = err + err;
+            if (twiceErr > (-dy)) {
+                let err = err - dy;
+                let x1 = x1 + stepX;
+            }
+            if (twiceErr < dx) {
+                let err = err + dx;
+                let y1 = y1 + stepY;
+            }
+        }
+        return;
     }
 
     /** Draws a filled rectangle whose top left corner is (x1, y1)
      *  and bottom right corner is (x2,y2), using the current color. */
     function void drawRectangle(int x1, int y1, int x2, int y2) {
+        var int y;
+
+        if ((x1 < 0) | (x1 > 511) | (x2 < 0) | (x2 > 511)
+            | (y1 < 0) | (y1 > 255) | (y2 < 0) | (y2 > 255) | (x1 > x2) | (y1 > y2)) {
+            do Sys.error(9);    // Illegal rectangle coordinates
+        }
+
+        let y = y1;
+        while (~(y > y2)) {
+            do Screen.drawHorizontal(x1, x2, y);
+            let y = y + 1;
+        }
+        return;
     }
 
-    /** Draws a filled circle of radius r<=181 around (x,y), using the current color. */
-    function void drawCircle(int x, int y, int r) {
+    /**
+     * Draws a filled circle of radius r<=181 around (x,y), using the current color.
+     *
+     * The midpoint circle algorithm. `d` is a decision variable that stays an
+     * integer and says, at each step, whether the true circle has fallen far
+     * enough for the outline to step inward -- so the whole circle is drawn
+     * with additions and comparisons, and not one square root or division.
+     *
+     * The obvious alternative is one row at a time with a half-width of
+     * sqrt(r*r - dy*dy). It is shorter to write and markedly slower to run: a
+     * square root costs eight multiplications, and this way pays none at all.
+     *
+     * Four horizontal spans are filled at each step rather than eight points
+     * plotted, which fills the disc instead of outlining it. The spans overlap
+     * near the diagonals; overlapping is free, because setting a pixel that is
+     * already set changes nothing.
+     *
+     * The limit of 181 is not arbitrary: r*r must stay inside a 16-bit
+     * integer, and 182 squared is 33124, past 32767.
+     */
+    function void drawCircle(int cx, int cy, int r) {
+        var int x, y, d;
+
+        if ((cx < 0) | (cx > 511) | (cy < 0) | (cy > 255)) {
+            do Sys.error(12);   // Illegal center coordinates
+        }
+        if ((r < 0) | (r > 181)) {
+            do Sys.error(13);   // Illegal radius
+        }
+
+        let x = 0;
+        let y = r;
+        let d = 1 - r;
+        do Screen.drawSpans(cx, cy, x, y);
+
+        while (x < y) {
+            let x = x + 1;
+            if (d < 0) {
+                let d = d + x + x + 1;
+            } else {
+                let y = y - 1;
+                let d = d + ((x - y) + (x - y)) + 1;
+            }
+            do Screen.drawSpans(cx, cy, x, y);
+        }
+        return;
+    }
+
+    /** The four horizontal spans of a circle that one (x,y) step determines. */
+    function void drawSpans(int cx, int cy, int x, int y) {
+        do Screen.drawHorizontal(cx - x, cx + x, cy + y);
+        do Screen.drawHorizontal(cx - x, cx + x, cy - y);
+        do Screen.drawHorizontal(cx - y, cx + y, cy + x);
+        do Screen.drawHorizontal(cx - y, cx + y, cy - x);
+        return;
     }
 }
